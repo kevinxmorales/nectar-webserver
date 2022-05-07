@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
+	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
 )
 
 func Run() error {
@@ -18,9 +18,15 @@ func Run() error {
 		fmt.Println("FAILED to migrate database")
 		return err
 	}
+
 	plantService := plant.NewService(database)
-	fmt.Println(plantService.GetPlant(context.Background(),
-		"8f94b0f4-1630-4727-a60b-8bfb715a985a"))
+	httpHandler := transportHttp.NewHandler(plantService)
+
+	fmt.Println("service has successfully started :)")
+	if err := httpHandler.Serve(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
