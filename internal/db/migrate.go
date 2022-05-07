@@ -7,6 +7,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
 )
 
 func (d *Database) MigrateDB() error {
@@ -29,6 +30,6 @@ func (d *Database) MigrateDB() error {
 			return fmt.Errorf("could not run up migrations: %w", err)
 		}
 	}
-	fmt.Println("successfully migrated the database")
+	log.Info("successfully migrated the database")
 	return nil
 }

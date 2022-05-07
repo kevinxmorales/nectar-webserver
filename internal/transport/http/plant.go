@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
-	"log"
 	"net/http"
 )
 
@@ -66,7 +66,7 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.Service.GetPlant(r.Context(), id)
 	if err != nil {
-		log.Print(err)
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +89,7 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.Service.UpdatePlant(r.Context(), id, p)
 	if err != nil {
-		log.Print(err)
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -107,7 +107,7 @@ func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.Service.DeletePlant(r.Context(), id)
 	if err != nil {
-		log.Print(err)
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

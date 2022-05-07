@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 )
 
@@ -37,23 +38,20 @@ func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, erro
 func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (plant.Plant, error) {
 	query := `INSERT INTO plants (id, plant_name, user_id)
 				VALUES (:id, :plant_name, :user_id)`
-	fmt.Println("db.AddPlant: Attempting to save plant to database")
+	log.Info("db.AddPlant: Attempting to save plant to database")
 	p.ID = uuid.NewV4().String()
 	plantRow := PlantRow{
 		ID:        p.ID,
 		PlantName: p.Name,
 		UserID:    p.UserId,
 	}
-	fmt.Println(plantRow)
 	rows, err := d.Client.NamedQueryContext(ctx, query, plantRow)
 	if err != nil {
 		return plant.Plant{}, fmt.Errorf("FAILED to insert plant: %w", err)
 	}
-	fmt.Println(rows)
 	if err := rows.Close(); err != nil {
 		return plant.Plant{}, fmt.Errorf("FAILED to close rows: %w", err)
 	}
-	fmt.Println("exiting db.AddPlant...")
 	return p, nil
 }
 

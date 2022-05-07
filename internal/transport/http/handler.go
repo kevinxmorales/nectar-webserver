@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/mux"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
@@ -60,6 +60,6 @@ func (h *Handler) Serve() error {
 	defer cancel()
 	h.Server.Shutdown(ctx)
 
-	log.Println("shut down gracefully")
+	log.Info("shut down gracefully")
 	return nil
 }

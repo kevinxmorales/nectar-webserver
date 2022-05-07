@@ -1,28 +1,28 @@
 package main
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
 )
 
 func Run() error {
-	fmt.Println("starting up application")
+	log.Info("starting up application")
 	database, err := db.NewDatabase()
 	if err != nil {
-		fmt.Println("FAILED to connect to the database")
+		log.Error("FAILED to connect to the database")
 		return err
 	}
 	if err := database.MigrateDB(); err != nil {
-		fmt.Println("FAILED to migrate database")
+		log.Error("FAILED to migrate database")
 		return err
 	}
 
 	plantService := plant.NewService(database)
 	httpHandler := transportHttp.NewHandler(plantService)
 
-	fmt.Println("service has successfully started :)")
+	log.Info("service has successfully started :)")
 	if err := httpHandler.Serve(); err != nil {
 		return err
 	}
@@ -31,8 +31,8 @@ func Run() error {
 }
 
 func main() {
-	fmt.Println("Nectar REST API")
+	log.Info("Nectar REST API")
 	if err := Run(); err != nil {
-		fmt.Println(err)
+		log.Error(err)
 	}
 }

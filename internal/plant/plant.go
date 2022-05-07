@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Category struct {
@@ -47,7 +49,7 @@ func NewService(store Store) *Service {
 }
 
 func (s *Service) GetPlant(ctx context.Context, id string) (Plant, error) {
-	fmt.Println("Retrieving a plant with id: ", id)
+	log.Info("Retrieving a plant with id: ", id)
 	plant, err := s.Store.GetPlant(ctx, id)
 	if err != nil {
 		fmt.Println(err)
@@ -59,7 +61,7 @@ func (s *Service) GetPlant(ctx context.Context, id string) (Plant, error) {
 func (s *Service) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant) (Plant, error) {
 	plant, err := s.Store.UpdatePlant(ctx, ID, updatedPlant)
 	if err != nil {
-		fmt.Println("error updating plant")
+		log.Error("error updating plant")
 		return Plant{}, err
 	}
 	return plant, nil
@@ -70,11 +72,10 @@ func (s *Service) DeletePlant(ctx context.Context, id string) error {
 }
 
 func (s *Service) PostPlant(ctx context.Context, newPlant Plant) (Plant, error) {
-	fmt.Println("plant.CreatePlant: attempting to add a new plant")
+	log.Info("attempting to add a new plant")
 	insertedPlant, err := s.Store.AddPlant(ctx, newPlant)
 	if err != nil {
 		return Plant{}, err
 	}
-	fmt.Println("exiting plant.CreatePlant")
 	return insertedPlant, nil
 }
