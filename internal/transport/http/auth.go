@@ -5,6 +5,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -31,7 +32,7 @@ func JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.
 }
 
 func validateToken(accessToken string) bool {
-	var signingKey = []byte("nectar")
+	var signingKey = []byte(os.Getenv("TOKEN_SECRET"))
 	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("could not validate auth token")
