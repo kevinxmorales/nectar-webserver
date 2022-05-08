@@ -14,14 +14,16 @@ import (
 const EMPTY = ""
 
 type Handler struct {
-	Router  *mux.Router
-	Service PlantService
-	Server  *http.Server
+	Router       *mux.Router
+	UserService  UserService
+	PlantService PlantService
+	Server       *http.Server
 }
 
-func NewHandler(service PlantService) *Handler {
+func NewHandler(plantService PlantService, userService UserService) *Handler {
 	h := &Handler{
-		Service: service,
+		PlantService: plantService,
+		UserService:  userService,
 	}
 	h.Router = mux.NewRouter()
 	h.mapRoutes()
@@ -39,16 +41,23 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "I am alive")
 	})
-	h.Router.HandleFunc("/api/v1/plant", JWTAuth(h.PostPlant)).Methods("POST")
-	h.Router.HandleFunc("/api/v1/plant/{id}", h.GetPlant).Methods("GET")
-	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.UpdatePlant)).Methods("PUT")
-	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.DeletePlant)).Methods("DELETE")
+	// Plant Endpoints
+	h.Router.HandleFunc("/api/v1/plant", JWTAuth(h.PostPlant)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant/{id}", h.GetPlant).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
+	// User Endpoints
+	h.Router.HandleFunc("/api/v1/user", h.PostUser).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.GetPlant).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.UpdateUser).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.DeleteUser).Methods(http.MethodDelete)
+
 }
 
 func (h *Handler) Serve() error {
 	go func() {
 		if err := h.Server.ListenAndServe(); err != nil {
-			log.Println(err.Error())
+			log.Error(err.Error())
 		}
 	}()
 

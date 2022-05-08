@@ -14,6 +14,13 @@ type PlantRow struct {
 	UserID    string `db:"user_id"`
 }
 
+type PlantCategory struct {
+	ID    uint   `db:"id"`
+	Icon  string `db:"icon"`
+	Label string `db:"label"`
+	Color string `db:"color"`
+}
+
 func convertPlantRowToPlant(p PlantRow) plant.Plant {
 	return plant.Plant{
 		ID:     p.ID,
@@ -22,10 +29,19 @@ func convertPlantRowToPlant(p PlantRow) plant.Plant {
 	}
 }
 
+func convertCatRowToCategory(pc PlantCategory) plant.Category {
+	return plant.Category{
+		ID:    pc.ID,
+		Icon:  pc.Icon,
+		Label: pc.Label,
+		Color: pc.Color,
+	}
+}
+
 func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, error) {
 	var plantRow PlantRow
-	query := `SELECT id, plant_name as plantName, user_id as userId
-				FROM plants WHERE id = $1`
+	query := `SELECT plnt_id, plnt_nm, plnt_usr_id
+				FROM plants WHERE plnt_id = $1`
 	row := d.Client.QueryRowContext(ctx, query, uuid)
 	err := row.Scan(&plantRow.ID, &plantRow.PlantName, &plantRow.UserID)
 	if err != nil {
@@ -36,7 +52,7 @@ func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, erro
 }
 
 func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (plant.Plant, error) {
-	query := `INSERT INTO plants (id, plant_name, user_id)
+	query := `INSERT INTO plants (plnt_id, plnt_nm, plnt_usr_id)
 				VALUES (:id, :plant_name, :user_id)`
 	log.Info("db.AddPlant: Attempting to save plant to database")
 	p.ID = uuid.NewV4().String()
@@ -56,7 +72,7 @@ func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (plant.Plant, er
 }
 
 func (d *Database) DeletePlant(ctx context.Context, id string) error {
-	query := "DELETE FROM plants where id = $1"
+	query := "DELETE FROM plants where plnt_id = $1"
 	_, err := d.Client.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("FAILED to delete plant from database: %w", err)
@@ -66,8 +82,8 @@ func (d *Database) DeletePlant(ctx context.Context, id string) error {
 
 func (d *Database) UpdatePlant(ctx context.Context, id string, p plant.Plant) (plant.Plant, error) {
 	query := `UPDATE plants SET
-		plant_name = :plant_name
-		WHERE id = :id`
+		plnt_nm = :plant_name
+		WHERE plnt_id = :id`
 	plantRow := PlantRow{
 		ID:        id,
 		PlantName: p.Name,

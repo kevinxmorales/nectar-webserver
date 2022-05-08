@@ -35,20 +35,20 @@ type Store interface {
 	UpdatePlant(context.Context, string, Plant) (Plant, error)
 }
 
-// Service - is the struct on which out logic will
+// PlantService - is the struct on which out logic will
 // be built upon
-type Service struct {
+type PlantService struct {
 	Store Store
 }
 
 // NewService - returns a pointer to a new service
-func NewService(store Store) *Service {
-	return &Service{
+func NewService(store Store) *PlantService {
+	return &PlantService{
 		Store: store,
 	}
 }
 
-func (s *Service) GetPlant(ctx context.Context, id string) (Plant, error) {
+func (s *PlantService) GetPlant(ctx context.Context, id string) (Plant, error) {
 	log.Info("Retrieving a plant with id: ", id)
 	plant, err := s.Store.GetPlant(ctx, id)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *Service) GetPlant(ctx context.Context, id string) (Plant, error) {
 	return plant, nil
 }
 
-func (s *Service) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant) (Plant, error) {
+func (s *PlantService) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant) (Plant, error) {
 	plant, err := s.Store.UpdatePlant(ctx, ID, updatedPlant)
 	if err != nil {
 		log.Error("error updating plant")
@@ -67,11 +67,11 @@ func (s *Service) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant
 	return plant, nil
 }
 
-func (s *Service) DeletePlant(ctx context.Context, id string) error {
+func (s *PlantService) DeletePlant(ctx context.Context, id string) error {
 	return s.Store.DeletePlant(ctx, id)
 }
 
-func (s *Service) PostPlant(ctx context.Context, newPlant Plant) (Plant, error) {
+func (s *PlantService) PostPlant(ctx context.Context, newPlant Plant) (Plant, error) {
 	log.Info("attempting to add a new plant")
 	insertedPlant, err := s.Store.AddPlant(ctx, newPlant)
 	if err != nil {

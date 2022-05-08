@@ -45,7 +45,7 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	convertedPlant := convertPlantRequestToPlant(plantRequest)
-	insertedPlant, err := h.Service.PostPlant(r.Context(), convertedPlant)
+	insertedPlant, err := h.PlantService.PostPlant(r.Context(), convertedPlant)
 	if err != nil {
 		log.Print(err)
 		return
@@ -64,7 +64,7 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	p, err := h.Service.GetPlant(r.Context(), id)
+	p, err := h.PlantService.GetPlant(r.Context(), id)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -87,7 +87,7 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	p, err := h.Service.UpdatePlant(r.Context(), id, p)
+	p, err := h.PlantService.UpdatePlant(r.Context(), id, p)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -105,7 +105,7 @@ func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err := h.Service.DeletePlant(r.Context(), id)
+	err := h.PlantService.DeletePlant(r.Context(), id)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

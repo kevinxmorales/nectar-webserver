@@ -5,6 +5,7 @@ import (
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 )
 
 func Run() error {
@@ -20,7 +21,8 @@ func Run() error {
 	}
 
 	plantService := plant.NewService(database)
-	httpHandler := transportHttp.NewHandler(plantService)
+	userService := user.NewService(database)
+	httpHandler := transportHttp.NewHandler(plantService, userService)
 
 	log.Info("service has successfully started :)")
 	if err := httpHandler.Serve(); err != nil {
