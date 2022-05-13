@@ -1,13 +1,20 @@
 package http
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strings"
 )
+
+type AuthService interface {
+	Login(context.Context, string, string) (string, error)
+}
 
 func JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -44,4 +51,35 @@ func validateToken(accessToken string) bool {
 		return false
 	}
 	return token.Valid
+}
+
+type LoginRequest struct {
+	Email    string `json:"email" required:"true"`
+	Password string `json:"password" required:"true"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	var loginRequest LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
+		log.Error(err)
+		http.Error(w, "unable to decode request", http.StatusInternalServerError)
+		return
+	}
+	validate := validator.New()
+	err := validate.Struct(loginRequest)
+	if err != nil {
+		log.Error(err)
+		http.Error(w, "not a valid user object", http.StatusBadRequest)
+		return
+	}
+	token, err := h.AuthService.Login(r.Context(), loginRequest.Email, loginRequest.Password)
+	err = json.NewEncoder(w).Encode(LoginResponse{Token: token})
+	if err != nil {
+		http.Error(w, "unable to encode JWT", http.StatusInternalServerError)
+		return
+	}
 }
