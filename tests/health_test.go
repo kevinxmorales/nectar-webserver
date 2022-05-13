@@ -13,6 +13,5 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	client := resty.New()
 	resp, err := client.R().Get("http://localhost:8080/alive")
 	assert.NoError(t, err)
-
 	assert.Equal(t, http.StatusOK, resp.StatusCode())
 }

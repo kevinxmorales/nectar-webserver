@@ -40,8 +40,9 @@ func convertCatRowToCategory(pc PlantCategory) plant.Category {
 
 func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, error) {
 	var plantRow PlantRow
-	query := `SELECT plnt_id, plnt_nm, plnt_usr_id
-				FROM plants WHERE plnt_id = $1`
+	query := `SELECT plnt_id, plnt_nm, plnt_usr_id 
+				FROM plants 
+				WHERE plnt_id = $1`
 	row := d.Client.QueryRowContext(ctx, query, uuid)
 	err := row.Scan(&plantRow.ID, &plantRow.PlantName, &plantRow.UserID)
 	if err != nil {
@@ -72,7 +73,8 @@ func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (plant.Plant, er
 }
 
 func (d *Database) DeletePlant(ctx context.Context, id string) error {
-	query := "DELETE FROM plants where plnt_id = $1"
+	query := `DELETE FROM plants 
+				WHERE plnt_id = $1`
 	_, err := d.Client.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("FAILED to delete plant from database: %w", err)

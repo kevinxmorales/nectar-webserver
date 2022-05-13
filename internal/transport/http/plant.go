@@ -36,18 +36,21 @@ func convertPlantRequestToPlant(p PostPlantRequest) plant.Plant {
 func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 	var plantRequest PostPlantRequest
 	if err := json.NewDecoder(r.Body).Decode(&plantRequest); err != nil {
+		log.Error(err)
+		http.Error(w, "unable to decode request", http.StatusInternalServerError)
 		return
 	}
 	validate := validator.New()
 	err := validate.Struct(plantRequest)
 	if err != nil {
+		log.Error(err)
 		http.Error(w, "not a valid plant object", http.StatusBadRequest)
 		return
 	}
 	convertedPlant := convertPlantRequestToPlant(plantRequest)
 	insertedPlant, err := h.PlantService.PostPlant(r.Context(), convertedPlant)
 	if err != nil {
-		log.Print(err)
+		log.Error(err)
 		return
 	}
 	if err := json.NewEncoder(w).Encode(insertedPlant); err != nil {
