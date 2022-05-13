@@ -2,6 +2,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
@@ -22,7 +23,8 @@ func Run() error {
 
 	plantService := plant.NewService(database)
 	userService := user.NewService(database)
-	httpHandler := transportHttp.NewHandler(plantService, userService)
+	authService := auth.NewService(database)
+	httpHandler := transportHttp.NewHandler(plantService, userService, authService)
 
 	log.Info("service has successfully started :)")
 	if err := httpHandler.Serve(); err != nil {

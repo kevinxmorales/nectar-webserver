@@ -17,13 +17,15 @@ type Handler struct {
 	Router       *mux.Router
 	UserService  UserService
 	PlantService PlantService
+	AuthService  AuthService
 	Server       *http.Server
 }
 
-func NewHandler(plantService PlantService, userService UserService) *Handler {
+func NewHandler(plantService PlantService, userService UserService, authService AuthService) *Handler {
 	h := &Handler{
 		PlantService: plantService,
 		UserService:  userService,
+		AuthService:  authService,
 	}
 	h.Router = mux.NewRouter()
 	h.mapRoutes()
@@ -41,6 +43,8 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "I am alive")
 	})
+	// Auth Endpoints
+	h.Router.HandleFunc("/api/v1/auth", h.Login).Methods(http.MethodPost)
 	// Plant Endpoints
 	h.Router.HandleFunc("/api/v1/plant", JWTAuth(h.PostPlant)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.GetPlant).Methods(http.MethodGet)
@@ -48,7 +52,8 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
 	// User Endpoints
 	h.Router.HandleFunc("/api/v1/user", h.PostUser).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/user/{id}", h.GetPlant).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.GetUser).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/email/{email}", h.GetUserByEmail).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/user/{id}", h.UpdateUser).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/user/{id}", h.DeleteUser).Methods(http.MethodDelete)
 
