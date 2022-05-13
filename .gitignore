@@ -22,5 +22,5 @@
 
 # Go workspace file
 go.work
-docker-compose.yml
-Taskfile.yml
+
+encrypt.go
