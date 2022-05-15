@@ -11,10 +11,11 @@ import (
 )
 
 type PlantService interface {
-	PostPlant(ctx context.Context, newPlant plant.Plant) (plant.Plant, error)
-	GetPlant(ctx context.Context, ID string) (plant.Plant, error)
-	UpdatePlant(ctx context.Context, ID string, newPlant plant.Plant) (plant.Plant, error)
-	DeletePlant(ctx context.Context, ID string) error
+	PostPlant(context.Context, plant.Plant) (plant.Plant, error)
+	GetPlant(context.Context, string) (plant.Plant, error)
+	GetPlantsByUserId(context.Context, string) ([]plant.Plant, error)
+	UpdatePlant(context.Context, string, plant.Plant) (plant.Plant, error)
+	DeletePlant(context.Context, string) error
 }
 
 type Response struct {
@@ -68,6 +69,24 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := h.PlantService.GetPlant(r.Context(), id)
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		panic(err)
+	}
+}
+
+func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == EMPTY {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	p, err := h.PlantService.GetPlantsByUserId(r.Context(), id)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

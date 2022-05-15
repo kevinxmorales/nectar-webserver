@@ -29,6 +29,7 @@ var ErrFetchingPlant = errors.New("failed to fetch plant by id")
 // the service needs in order to operate
 type Store interface {
 	GetPlant(context.Context, string) (Plant, error)
+	GetPlantsByUserId(context.Context, string) ([]Plant, error)
 	AddPlant(context.Context, Plant) (Plant, error)
 	DeletePlant(context.Context, string) error
 	UpdatePlant(context.Context, string, Plant) (Plant, error)
@@ -55,6 +56,15 @@ func (s *Service) GetPlant(ctx context.Context, id string) (Plant, error) {
 		return Plant{}, ErrFetchingPlant
 	}
 	return plant, nil
+}
+
+func (s *Service) GetPlantsByUserId(ctx context.Context, id string) ([]Plant, error) {
+	plantList, err := s.Store.GetPlantsByUserId(ctx, id)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return plantList, nil
 }
 
 func (s *Service) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant) (Plant, error) {

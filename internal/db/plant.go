@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -38,6 +39,19 @@ func convertCatRowToCategory(pc PlantCategory) plant.Category {
 	}
 }
 
+func convertPlantRowsToPlantList(rows *sql.Rows) ([]plant.Plant, error) {
+	var plantList []plant.Plant
+	for rows.Next() {
+		pr := PlantRow{}
+		if err := rows.Scan(&pr.ID, &pr.PlantName, &pr.UserID); err != nil {
+			return nil, err
+		}
+		p := convertPlantRowToPlant(pr)
+		plantList = append(plantList, p)
+	}
+	return plantList, nil
+}
+
 func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, error) {
 	var plantRow PlantRow
 	query := `SELECT plnt_id, plnt_nm, plnt_usr_id 
@@ -50,6 +64,17 @@ func (d *Database) GetPlant(ctx context.Context, uuid string) (plant.Plant, erro
 	}
 
 	return convertPlantRowToPlant(plantRow), nil
+}
+
+func (d *Database) GetPlantsByUserId(ctx context.Context, uuid string) ([]plant.Plant, error) {
+	query := `SELECT plnt_id, plnt_nm, plnt_usr_id 
+				FROM plants 
+				WHERE plnt_usr_id = $1`
+	rows, err := d.Client.QueryContext(ctx, query, uuid)
+	if err != nil {
+		return nil, err
+	}
+	return convertPlantRowsToPlantList(rows)
 }
 
 func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (plant.Plant, error) {

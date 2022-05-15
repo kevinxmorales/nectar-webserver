@@ -49,13 +49,13 @@ func TestPlantDatabase(t *testing.T) {
 
 		originalName := "testingPlant"
 		userId := uuid.NewV4().String()
-		newName := "newPlantName"
 		p, err := db.AddPlant(context.Background(), plant.Plant{
 			Name:   originalName,
 			UserId: userId,
 		})
 		assert.NoError(t, err)
 
+		newName := "newPlantName"
 		updatedPlant, err := db.UpdatePlant(context.Background(), p.ID, plant.Plant{
 			Name:   newName,
 			UserId: userId,
@@ -72,6 +72,63 @@ func TestPlantDatabase(t *testing.T) {
 		idNotInDB := uuid.NewV4().String()
 		_, err = db.GetPlant(context.Background(), idNotInDB)
 		assert.Error(t, err)
+	})
+
+	t.Run("test get plants by user id", func(t *testing.T) {
+		db, err := NewDatabase()
+		assert.NoError(t, err)
+		userID := uuid.NewV4().String()
+		numPlants := 3
+		var plantList []plant.Plant
+		for i := 0; i < numPlants; i++ {
+			name := "testPlant"
+			p := plant.Plant{
+				Name:   name,
+				UserId: userID,
+			}
+			plantList = append(plantList, p)
+		}
+
+		//insert 3 plants belonging to the same user
+		for i := 0; i < numPlants; i++ {
+			insertedPlant, err := db.AddPlant(context.Background(), plantList[i])
+			assert.NoError(t, err)
+			plantList[i].ID = insertedPlant.ID
+		}
+
+		//insert 1 plant that does not belong to this user
+		notMyPlant, err := db.AddPlant(context.Background(), plant.Plant{
+			Name:   "testPlant2",
+			UserId: uuid.NewV4().String(),
+		})
+
+		userPlants, err := db.GetPlantsByUserId(context.Background(), userID)
+		assert.NoError(t, err)
+		assert.Equal(t, numPlants, len(userPlants))
+
+		// Assert that the array only contains plants that
+		// belong to the user
+		for i := 0; i < numPlants; i++ {
+			assert.NotEqual(t, notMyPlant.ID, plantList[i].ID)
+		}
+	})
+
+	t.Run("test getting plants by user id, where user has no plants", func(t *testing.T) {
+		db, err := NewDatabase()
+		assert.NoError(t, err)
+
+		userId := uuid.NewV4().String()
+		_, err = db.AddPlant(context.Background(), plant.Plant{
+			Name:   "testPlant",
+			UserId: userId,
+		})
+		assert.NoError(t, err)
+
+		otherId := uuid.NewV4().String()
+		plantList, err := db.GetPlantsByUserId(context.Background(), otherId)
+		assert.NoError(t, err)
+		// User has no plants, should return an empty slice
+		assert.Equal(t, 0, len(plantList))
 	})
 
 }
