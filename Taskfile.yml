@@ -1,1 +1,50 @@
-cw5lc7x_-gNDzRXJ02vOaku7DCl8I6LsZAHRJMmHRXHdvWrjUo6y16s8X-9TISDiH4a42fZezFjZBEHfCrnlNAdO2yq3zLAAsm9TtO5wk0kImIIeBuIdwpmoV_WpuFfaiZQsCKZoFRRwmt8R-Iou2pf7J0NIANtTMlqp3JeJW4cgrzwUL9pQWEi-3bwqOO4K9DMG2WA47k2J5ZvYFJQlQusbcMjhY25X4e31TqhaMFRXJJ2NTYsJ1VZ9ZAitKKUVS6Ah8WzXn1ER9OvI9ldNea3IzEJvsJ_mJkRTAvjiR3c5oPmEuwdnI5qe0BpsMVp2oSwIvh2Fx8ahGidUwn-QHNs4B-1DSaGKJ8UXfRkdQqUmBFk01Qo8hMpSztWPqunnLyAcArXRBPrI_l_b8awdYKqoOJURIbtQTDwgNtEUa2IFcCSiuZpzokJarwhyLGTojv0kPgMEB60nyNDVRK1pViAI-Ka4ndOa0QapBpTl20r_aiNaSacrBTF_dV1ommqyeGAG8PtqkaZ2Lzvs-_qiO0X7BI8sgWQEoQ95HdtEwv05d-3mWW79QfYeUuetKeUDI7IvrdvSqGEBVmBC8JlafA2uoIg-Z0kEPt91J1dl2taG4Yz8ilKQkJ0k5rZWPACrbLR96VZB3elz_4pWu1SWLYamj0t_LWNBOkzD5OVtcXCMJxj36JvEP3ThoIuNlXwtyC2_Sr1j19e7YiRqc1OMr4eJnPu5QIZa2IA29SghdaZpfEISdMAozh5jtvQhY3WBq-0ppKdYNLv4gJgiU6ZA-KOkrCxOZTD_ELi1juJwc3TbKT4NJFYyTPZM8_xwsI-0AmhhkXc6yIkxHNTp8FLLA0m9F0bubVohcA_F3wKl9ejo-9uxTvrDoulsEGjgG1q-OwV862CgTxSZEviN0NNIMtiOOhNXXWd_C04OtRHjdfcd1ijovdgvdBAMfuMSPBfVwXuOyPRFGOPouNYva1TtGlaKsE4WAkt8M-pcrW47ICXElIOYIPh6q7QlPvHfmQ-KfcSw1n88dWsnVTOLW74AA7DoJJrB0xRh63ZY2zo__tGS5MG9QRKHbihv1NncDYzf6rJbJ3IQ2JoYjtQLoYsOzI5I1XMgAHW6QdPjoKEPY176Domo6a8U2Klk51LM320eTIen_r4piL5djj34ZNfdHRN9VQqmUuSq41yA1hwsGnkA5xBT42zwm0OaFJ4wb8jc6yRXdwHKmu-sFvrxx3BFffQb9U9X9GaSZzhLqP3NssrvHozogrgGZBm7rJ8H-VzX2Y64snhh1s0KuqLrXg20lsMv8vBnxZG66AKzuw9p2CA7kaNrsLkkfMC9gx4MxT7R0TbSS74TjdWuK7LwN2Vu2270VpTO6xSmMQAV8cWNelNxkczKs8S4-l2fPYYvyDMqdvtj0WG7vdGQ1P151nNJ9JuatIwnJHMWEvst_FQ7Yx1r5b_eTdZaJU4sg5B-e5N_nAyzJIMfmgLchkmAld8WezY86BRa0pf6B0PzA3ermlu0wI2huV3IajwFmuClQEv7tCD4HdycWjMRKBFSE5KYWC2B7NBtImQZnD_sJ5o88yHczZcAxQHhwQf00GBbTcWNO8188y9Bs9qnb-HQpJGTKKWSUlNGjwSzkll8AIapTvRSMj9rqHWl0-MTwRPuiwDiwidwxxB0_RSg0_tSU8uQsRjPYuhQ5S8gTQg6thiodfq7duVNCsUX2h3P_Te31oFvvi5-4yBRolrthnaECaLrOgGGVbk6w9Mr62iRg41L-K0Y4etoQXKNPyGSpO2T9Bu80JQaHWF5191vX7ugrzazcT-dYIUpM_8piT-hQc-nnY0YD-oS4EGvrXvvjQtNxTObDUr-DlcUediw8xpoHyMaI9eQ46V6GKQqKW0EDMpoXXH9OpOW-h5lN7OdQktiD020cvtBgBgy8Lt8L9Q=
+version: "3"
+
+tasks:
+  build:
+    cmds:
+      - go build -o app cmd/server/main.go
+  test:
+    cmds:
+      - go test -v ./...
+  lint:
+    cmds:
+      - golangci-lint run
+  run:
+    cmds:
+      - docker-compose up --build
+
+  integration-tests:
+    cmds:
+      - docker-compose -f docker-compose-for-tests.yml up -d db
+      - cat migrations/0001_init_schema.down.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
+      - cat migrations/0001_init_schema.up.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
+      - go test -tags=integration -v ./...
+      - docker-compose down
+
+    env:
+      DB_USERNAME: postgres
+      DB_PASSWORD: pgpassword
+      DB_TABLE: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_DB: postgres
+      SSL_MODE: disable
+      TOKEN_SECRET: nectar
+
+  acceptance_tests:
+    cmds:
+      - docker-compose -f docker-compose-for-tests.yml up -d
+      - cat migrations/0001_init_schema.down.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
+      - cat migrations/0001_init_schema.up.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
+      - go test -tags=e2e -v ./...
+      - docker-compose down
+    env:
+      DB_USERNAME: postgres
+      DB_PASSWORD: pgpassword
+      DB_TABLE: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_DB: postgres
+      SSL_MODE: disable
+      TOKEN_SECRET: nectar
