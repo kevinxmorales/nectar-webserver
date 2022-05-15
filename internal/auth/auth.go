@@ -42,12 +42,9 @@ func (s *Service) Login(ctx context.Context, email string, givenPassword string)
 	if err != nil {
 		return "", err
 	}
-	log.Info(usr)
 	// If a password exists for the given user
 	// AND, if it is the same as the password we received, then we can move ahead
 	// if NOT, then we return an "Unauthorized" status
-	log.Info(usr.Password)
-	log.Info(givenPassword)
 	if usr.Password != givenPassword {
 		return "", fmt.Errorf("unauthorized")
 	}
@@ -66,13 +63,11 @@ func (s *Service) Login(ctx context.Context, email string, givenPassword string)
 	}
 	// Declare the token with the algorithm used for signing, and the claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	log.Info(token)
 	// Create the JWT string
 	tokenString, err := token.SignedString([]byte("nectar"))
 	if err != nil {
 		log.Error(err)
 		return "", err
 	}
-	log.Info(tokenString)
 	return tokenString, nil
 }

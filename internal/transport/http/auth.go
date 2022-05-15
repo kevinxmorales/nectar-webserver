@@ -70,15 +70,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	validate := validator.New()
-	err := validate.Struct(loginRequest)
-	if err != nil {
+	if err := validate.Struct(loginRequest); err != nil {
 		log.Error(err)
 		http.Error(w, "not a valid user object", http.StatusBadRequest)
 		return
 	}
 	token, err := h.AuthService.Login(r.Context(), loginRequest.Email, loginRequest.Password)
-	err = json.NewEncoder(w).Encode(LoginResponse{Token: token})
 	if err != nil {
+		http.Error(w, "unable to authenticate", http.StatusUnauthorized)
+	}
+	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
 		http.Error(w, "unable to encode JWT", http.StatusInternalServerError)
 		return
 	}

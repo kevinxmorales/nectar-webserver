@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
@@ -13,11 +14,11 @@ func Run() error {
 	log.Info("starting up application")
 	database, err := db.NewDatabase()
 	if err != nil {
-		log.Error("FAILED to connect to the database")
+		log.Error("FAILED to connect to the database", err)
 		return err
 	}
 	if err := database.MigrateDB(); err != nil {
-		log.Error("FAILED to migrate database")
+		log.Error("FAILED to migrate database", err)
 		return err
 	}
 
@@ -35,8 +36,18 @@ func Run() error {
 }
 
 func main() {
-	log.Info("Nectar REST API")
+	PrintBanner()
 	if err := Run(); err != nil {
 		log.Error(err)
 	}
+}
+
+func PrintBanner() {
+	fmt.Println(",--.  ,--.                  ,--.                    ")
+	fmt.Println("|  ,'.|  |  ,---.   ,---. ,-'  '-.  ,--,--. ,--.--. ")
+	fmt.Println("|  |' '  | | .-. : | .--' '-.  .-' ' ,-.  | |  .--' ")
+	fmt.Println("|  | `   | \\   --. \\ `--.   |  |   \\ '-'  | |  |    ")
+	fmt.Println("`--'  `--'  `----'  `---'   `--'    `--`--' `--'    ")
+	fmt.Println("----------------- Nectar REST API -----------------")
+
 }
