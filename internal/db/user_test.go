@@ -97,7 +97,7 @@ func TestUserDatabase(t *testing.T) {
 		assert.NoError(t, err)
 
 		//This should fail, expecting an error
-		_, err = db.AddUser(context.Background(), insertedUser)
+		_, err = db.AddUser(context.Background(), *insertedUser)
 		assert.Error(t, err)
 
 		err = db.DeleteUser(context.Background(), insertedUser.ID)
