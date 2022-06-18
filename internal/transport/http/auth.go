@@ -7,13 +7,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
 	"net/http"
 	"os"
 	"strings"
 )
 
 type AuthService interface {
-	Login(context.Context, string, string) (string, error)
+	Login(context.Context, string, string) (*auth.TokenDetails, error)
 }
 
 func JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +48,7 @@ func validateToken(accessToken string) bool {
 		return signingKey, nil
 	})
 	if err != nil {
+		log.Info("An error occurred while validating token")
 		log.Error(err)
 		return false
 	}
@@ -59,7 +61,8 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -75,11 +78,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not a valid user object", http.StatusBadRequest)
 		return
 	}
-	token, err := h.AuthService.Login(r.Context(), loginRequest.Email, loginRequest.Password)
+	td, err := h.AuthService.Login(r.Context(), loginRequest.Email, loginRequest.Password)
 	if err != nil {
 		http.Error(w, "unable to authenticate", http.StatusUnauthorized)
+		return
 	}
-	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
+	if err := json.NewEncoder(w).Encode(LoginResponse{Token: td.AccessToken, RefreshToken: td.RefreshToken}); err != nil {
 		http.Error(w, "unable to encode JWT", http.StatusInternalServerError)
 		return
 	}
