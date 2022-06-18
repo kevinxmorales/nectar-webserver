@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang-jwt/jwt"
-	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
+	"golang.org/x/crypto/bcrypt"
+	"os"
 	"time"
 )
 
@@ -15,10 +16,22 @@ type Credentials struct {
 }
 
 type Claims struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID        string `json:"id"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Email     string `json:"email"`
 	jwt.StandardClaims
+}
+
+type RefreshClaims struct {
+	ID string `json:"id"`
+	jwt.StandardClaims
+}
+
+// TokenDetails For storing in Redis
+type TokenDetails struct {
+	AccessToken  string
+	RefreshToken string
 }
 
 type Store interface {
@@ -36,38 +49,60 @@ func NewService(store Store) *Service {
 	}
 }
 
-func (s *Service) Login(ctx context.Context, email string, givenPassword string) (string, error) {
-	// Get the expected password from our in memory map
-	usr, err := s.Store.GetCredentialsByEmail(ctx, email)
-	if err != nil {
-		return "", err
-	}
-	// If a password exists for the given user
-	// AND, if it is the same as the password we received, then we can move ahead
-	// if NOT, then we return an "Unauthorized" status
-	if usr.Password != givenPassword {
-		return "", fmt.Errorf("unauthorized")
-	}
-	// Declare the expiration time of the token
-	// here, we have kept it as 5 minutes
-	expirationTime := time.Now().Add(5 * time.Minute)
-	// Create the JWT claims, which includes the username and expiry time
+func CreateToken(usr user.User) (*TokenDetails, error) {
+	td := TokenDetails{}
+	expirationTime := time.Now().Add((((1 * time.Hour) * 24) * 7) * 52)
 	claims := &Claims{
-		ID:    usr.ID,
-		Name:  usr.Name,
-		Email: usr.Email,
+		ID:        usr.ID,
+		FirstName: usr.FirstName,
+		LastName:  usr.LastName,
+		Email:     usr.Email,
 		StandardClaims: jwt.StandardClaims{
 			// In JWT, the expiry time is expressed as unix milliseconds
 			ExpiresAt: expirationTime.Unix(),
 		},
 	}
 	// Declare the token with the algorithm used for signing, and the claims
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	// Create the JWT string
-	tokenString, err := token.SignedString([]byte("nectar"))
+	accessTokenSigned, err := accessToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
 	if err != nil {
-		log.Error(err)
-		return "", err
+		return nil, err
 	}
-	return tokenString, nil
+	expirationTime = time.Now().Add(time.Hour * 24)
+	refreshClaims := RefreshClaims{
+		ID: usr.ID,
+		StandardClaims: jwt.StandardClaims{
+			// In JWT, the expiry time is expressed as unix milliseconds
+			ExpiresAt: expirationTime.Unix(),
+		},
+	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshTokenSigned, err := refreshToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
+	if err != nil {
+		return nil, err
+	}
+
+	td.AccessToken = accessTokenSigned
+	td.RefreshToken = refreshTokenSigned
+	return &td, nil
+}
+
+// Check if two passwords do not match using Bcrypt's CompareHashAndPassword
+// return nil on success and an error on failure
+func passwordsDoNotMatch(hashedPassword, currPassword string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(currPassword))
+	return err != nil
+}
+
+func (s *Service) Login(ctx context.Context, email string, givenPassword string) (*TokenDetails, error) {
+	// Get the expected password from our in memory map
+	usr, err := s.Store.GetCredentialsByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if passwordsDoNotMatch(usr.Password, givenPassword) {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	return CreateToken(usr)
 }
