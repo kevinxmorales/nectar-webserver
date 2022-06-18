@@ -3,6 +3,7 @@ module gitlab.com/kevinmorales/nectar-rest-api
 go 1.18
 
 require (
+	github.com/aws/aws-sdk-go v1.17.7
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-migrate/migrate/v4 v4.15.2
@@ -22,6 +23,7 @@ require (
 	github.com/h2non/bimg v1.1.9 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
