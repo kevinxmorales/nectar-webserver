@@ -15,26 +15,28 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, email, password := "Kevin", "kevin@email.com", "my_password"
+		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
 		insertedUser, err := db.AddUser(context.Background(), user.User{
-			Name:     firstName,
-			Email:    email,
-			Password: password,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
+			Password:  password,
 		})
 		assert.NoError(t, err)
 		newUser, err := db.GetUser(context.Background(), insertedUser.ID)
-		assert.Equal(t, firstName, newUser.Name)
+		assert.Equal(t, firstName, newUser.FirstName)
 		db.DeleteUser(context.Background(), newUser.ID)
 	})
 
 	t.Run("test delete user", func(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
-		firstName, email, password := "Kevin", "kevin@email.com", "my_password"
+		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
 		newUser, err := db.AddUser(context.Background(), user.User{
-			Name:     firstName,
-			Email:    email,
-			Password: password,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
+			Password:  password,
 		})
 		assert.NoError(t, err)
 
@@ -49,18 +51,20 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, email, password := "Kevin", "kevin@email.com", "my_password"
+		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
 		newUser, err := db.AddUser(context.Background(), user.User{
-			Name:     firstName,
-			Email:    email,
-			Password: password,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
+			Password:  password,
 		})
 		assert.NoError(t, err)
 		newEmail := "kevin@protonmail.com"
 		updatedUser, err := db.UpdateUser(context.Background(), newUser.ID, user.User{
-			Name:     newUser.Name,
-			Email:    newEmail,
-			Password: newUser.Password,
+			FirstName: newUser.FirstName,
+			LastName:  newUser.LastName,
+			Email:     newEmail,
+			Password:  newUser.Password,
 		})
 		assert.NoError(t, err)
 
@@ -83,11 +87,12 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, email, password := "Kevin", "kevin1234@email.com", "my_password"
+		firstName, lastName, email, password := "Kevin", "Morales", "kevin1234@email.com", "my_password"
 		insertedUser, err := db.AddUser(context.Background(), user.User{
-			Name:     firstName,
-			Email:    email,
-			Password: password,
+			FirstName: firstName,
+			LastName:  lastName,
+			Email:     email,
+			Password:  password,
 		})
 		assert.NoError(t, err)
 
