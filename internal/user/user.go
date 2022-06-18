@@ -2,22 +2,23 @@ package user
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 )
 
 type User struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID         string `json:"id"`
+	FirstName  string `json:"firstName"`
+	LastName   string `json:"lastName"`
+	Email      string `json:"email"`
+	Password   string `json:"-"`
+	PlantCount uint   `json:"plantCount"`
 }
 
 type Store interface {
-	GetUser(context.Context, string) (User, error)
-	GetUserByEmail(context.Context, string) (User, error)
-	AddUser(context.Context, User) (User, error)
+	GetUser(context.Context, string) (*User, error)
+	GetUserByEmail(context.Context, string) (*User, error)
+	AddUser(context.Context, User) (*User, error)
 	DeleteUser(context.Context, string) error
-	UpdateUser(context.Context, string, User) (User, error)
+	UpdateUser(context.Context, string, User) (*User, error)
 }
 
 type Service struct {
@@ -31,40 +32,21 @@ func NewService(store Store) *Service {
 	}
 }
 
-func (s *Service) GetUser(ctx context.Context, id string) (User, error) {
-	log.Info("in Service.GetUser")
-	usr, err := s.Store.GetUser(ctx, id)
-	if err != nil {
-		log.Info("exiting Service.GetUser...")
-		return User{}, err
-	}
-	log.Info("exiting Service.GetUser...")
-	return usr, nil
+func (s *Service) GetUser(ctx context.Context, id string) (*User, error) {
+	return s.Store.GetUser(ctx, id)
 }
 
-func (s *Service) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	usr, err := s.Store.GetUserByEmail(ctx, email)
-	if err != nil {
-		return User{}, err
-	}
-	return usr, nil
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	return s.Store.GetUserByEmail(ctx, email)
 }
 
-func (s *Service) AddUser(ctx context.Context, usr User) (User, error) {
-	newUser, err := s.Store.AddUser(ctx, usr)
-	if err != nil {
-		return User{}, err
-	}
-	return newUser, nil
+func (s *Service) AddUser(ctx context.Context, usr User) (*User, error) {
+	return s.Store.AddUser(ctx, usr)
 }
 func (s *Service) DeleteUser(ctx context.Context, id string) error {
 	return s.Store.DeleteUser(ctx, id)
 
 }
-func (s *Service) UpdateUser(ctx context.Context, id string, usr User) (User, error) {
-	updatedUser, err := s.Store.UpdateUser(ctx, id, usr)
-	if err != nil {
-		return User{}, err
-	}
-	return updatedUser, nil
+func (s *Service) UpdateUser(ctx context.Context, id string, usr User) (*User, error) {
+	return s.Store.UpdateUser(ctx, id, usr)
 }
