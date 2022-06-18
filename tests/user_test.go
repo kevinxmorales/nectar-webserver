@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"net/http"
@@ -18,14 +17,14 @@ const url = BaseUrl + "/" + Version + "/" + userEndpoint
 func TestPostUserBadEmail(t *testing.T) {
 
 	t.Run("cannot create a user with a bad email address", func(t *testing.T) {
-		name, email, password := "kevin", "kevinEmail.com", "password123"
+		first, last, email, password := "kevin", "Morales", "kevinEmail.com", "password123"
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "%s",
+				"firstName": "%s",
+				"lastName": "%s",
 				"email": "%s",
-				"password": "%s"}`, name, email, password)).
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+				"password": "%s"}`, first, last, email, password)).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode())
@@ -34,14 +33,14 @@ func TestPostUserBadEmail(t *testing.T) {
 
 func TestPostUserThenGetUser(t *testing.T) {
 	t.Run("can get a user from the db", func(t *testing.T) {
-		name, email, password := "kevin", "kevin@email.com", "password123"
+		first, last, email, password := "kevin", "Morales", "kevin@email.com", "password123"
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "%s",
+				"firstName": "%s",
+				"lastName": "%s",
 				"email": "%s",
-				"password": "%s"}`, name, email, password)).
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+				"password": "%s"}`, first, last, email, password)).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
@@ -53,9 +52,8 @@ func TestPostUserThenGetUser(t *testing.T) {
 		assert.NotNil(t, usr.ID)
 
 		resp, err = client.R().
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Get(url + "/" + usr.ID)
-		log.Error(err)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
 	})
@@ -64,18 +62,18 @@ func TestPostUserThenGetUser(t *testing.T) {
 func TestPostUserThenDeleteUser(t *testing.T) {
 	t.Run("can delete a user", func(t *testing.T) {
 		// create the user
-		name, email, password := "kevin", "kevin@email.com", "password123"
+		first, last, email, password := "kevin", "Morales", "kevin@yahoo.com", "password123"
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "%s",
+				"firstName": "%s",
+				"lastName": "%s",
 				"email": "%s",
-				"password": "%s"}`, name, email, password)).
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+				"password": "%s"}`, first, last, email, password)).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
-
 		body := resp.Body()
 		var usr user.User
 		err = json.Unmarshal(body, &usr)
@@ -84,14 +82,14 @@ func TestPostUserThenDeleteUser(t *testing.T) {
 
 		// delete the user
 		resp, err = client.R().
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Delete(url + "/" + usr.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
 
 		// try to get deleted user, expected to fail
 		resp, err = client.R().
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Get(url + "/" + usr.ID)
 		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode())
 	})
@@ -100,14 +98,15 @@ func TestPostUserThenDeleteUser(t *testing.T) {
 func TestPostUserThenPut(t *testing.T) {
 	t.Run("can edit a user", func(t *testing.T) {
 		// create the user
-		name, email, password := "kevin", "kevin@email.com", "password123"
+		first, last, email, password := "kevin", "Morales", "kevin@protonmail.com", "password123"
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "%s",
+				"firstName": "%s",
+				"lastName": "%s",
 				"email": "%s",
-				"password": "%s"}`, name, email, password)).
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+				"password": "%s"}`, first, last, email, password)).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
@@ -119,13 +118,14 @@ func TestPostUserThenPut(t *testing.T) {
 		assert.NotNil(t, usr.ID)
 
 		// edit the user with PUT request
-		newName, newEmail := "Joe", "joe@email.com"
+		newFirst, newLast, newEmail := "Joe", "Biden", "joe@email.com"
 		editUserJson := fmt.Sprintf(`{
-				"name": "%s",
+				"firstName": "%s",
+				"lastName": "%s",
 				"email": "%s"
-				}`, newName, newEmail)
+				}`, newFirst, newLast, newEmail)
 		resp, err = client.R().
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			SetBody(editUserJson).
 			Put(url + "/" + usr.ID)
 		assert.NoError(t, err)
@@ -135,6 +135,6 @@ func TestPostUserThenPut(t *testing.T) {
 		err = json.Unmarshal(body, &newUser)
 		assert.NoError(t, err)
 
-		assert.Equal(t, newName, newUser.Name)
+		assert.Equal(t, newFirst, newUser.FirstName)
 	})
 }

@@ -18,9 +18,9 @@ func TestPostPlant(t *testing.T) {
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "testPlant",
-				"userId": "%s"}`, id)).
-			SetHeader("Authorization", fmt.Sprintf("Bearer %s", CreateToken())).
+					"name": "testPlant",
+					"userId": "%s"}`, id)).
+			SetHeader("Authorization", fmt.Sprintf("Bearer %s", GetToken())).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode())
@@ -31,8 +31,8 @@ func TestPostPlant(t *testing.T) {
 		client := resty.New()
 		resp, err := client.R().
 			SetBody(fmt.Sprintf(`{
-				"name": "testPlant",
-				"userId": "%s"}`, id)).
+					"name": "testPlant",
+					"userId": "%s"}`, id)).
 			Post(url)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode())

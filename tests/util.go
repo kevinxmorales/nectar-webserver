@@ -11,7 +11,7 @@ const Version = "v1"
 const plantEndpoint = "plant"
 const userEndpoint = "user"
 
-func CreateToken() string {
+func GetToken() string {
 	token := jwt.New(jwt.SigningMethodHS256)
 	tokenString, err := token.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
 	if err != nil {
