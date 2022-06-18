@@ -3,18 +3,24 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-playground/validator/v10"
+	"errors"
+	"fmt"
 	"github.com/gorilla/mux"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
+	"io"
 	"net/http"
+	"os"
+	"time"
 )
 
 type PlantService interface {
-	PostPlant(context.Context, plant.Plant) (plant.Plant, error)
-	GetPlant(context.Context, string) (plant.Plant, error)
+	PostPlant(context.Context, plant.Plant) (*plant.Plant, error)
+	GetPlant(context.Context, string) (*plant.Plant, error)
 	GetPlantsByUserId(context.Context, string) ([]plant.Plant, error)
-	UpdatePlant(context.Context, string, plant.Plant) (plant.Plant, error)
+	UpdatePlant(context.Context, string, plant.Plant) (*plant.Plant, error)
 	DeletePlant(context.Context, string) error
 }
 
@@ -35,106 +41,139 @@ func convertPlantRequestToPlant(p PostPlantRequest) plant.Plant {
 }
 
 func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
-	var plantRequest PostPlantRequest
-	if err := json.NewDecoder(r.Body).Decode(&plantRequest); err != nil {
-		log.Error(err)
-		http.Error(w, "unable to decode request", http.StatusInternalServerError)
-		return
-	}
-	validate := validator.New()
-	err := validate.Struct(plantRequest)
+	err := r.ParseMultipartForm(200000) // grab the multipart form
 	if err != nil {
-		log.Error(err)
-		http.Error(w, "not a valid plant object", http.StatusBadRequest)
+		fmt.Fprintln(w, err)
 		return
 	}
-	convertedPlant := convertPlantRequestToPlant(plantRequest)
-	insertedPlant, err := h.PlantService.PostPlant(r.Context(), convertedPlant)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	if err := json.NewEncoder(w).Encode(insertedPlant); err != nil {
-		panic(err)
-		return
+	formdata := r.MultipartForm
+
+	var fileNames []string
+	for index := 0; index < 3; index++ {
+		fileName := fmt.Sprintf("image%d", index)
+		files, ok := formdata.File[fileName] // grab the filenames
+		// loop through the files one by one
+		func() {
+			if !ok {
+				log.Error(fmt.Sprintf("file not found: %s", fileName))
+				return
+			}
+			file, err := files[0].Open()
+			defer file.Close()
+			if err != nil {
+				fmt.Fprintln(w, err)
+				return
+			}
+			year, month, day := time.Now().Date()
+			hour := time.Now().Hour()
+			minute := time.Now().Minute()
+			newFileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s", year, month, day, hour, minute, uuid.NewV4().String())
+			fmt.Println(newFileName)
+			out, err := os.Create(newFileName)
+			defer out.Close()
+			if err != nil {
+				fmt.Fprintf(w, "Unable to create the file for writing")
+				return
+			}
+			/*
+				image, err := jpeg.Decode(file)
+				opt := jpeg.Options{
+					Quality: 90,
+				}
+				err = jpeg.Encode(out, image, &opt)
+				if err != nil {
+					fmt.Fprintln(w, err)
+					return
+				}
+
+			*/
+
+			_, err = io.Copy(out, file) // file not files[i] !
+			if err != nil {
+				fmt.Fprintln(w, err)
+				return
+			}
+
+			//fmt.Fprintf(w, "Files uploaded successfully : ")
+			//fmt.Fprintf(w, files[0].Filename+"\n")
+			fileNames = append(fileNames, newFileName)
+		}()
 	}
 
+	var s3FileNames []string
+	for i := 0; i < len(fileNames); i++ {
+		s3, err := blob.UploadToS3(fileNames[i])
+		if err != nil {
+			panic(err)
+		}
+		s3FileNames = append(s3FileNames, s3.URL)
+	}
+	sendOkResponse(w, r, s3FileNames)
 }
 
 func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		w.WriteHeader(http.StatusBadRequest)
+		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	p, err := h.PlantService.GetPlant(r.Context(), id)
 	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		send500Response(w, r, err)
 		return
 	}
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		panic(err)
-	}
+	sendOkResponse(w, r, p)
 }
 
 func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		w.WriteHeader(http.StatusBadRequest)
+		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
+	log.Info(fmt.Sprintf("Attempting to get all plants that belong to user with id: %s", id))
 	p, err := h.PlantService.GetPlantsByUserId(r.Context(), id)
 	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		send500Response(w, r, err)
 		return
 	}
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		panic(err)
-	}
+	sendOkResponse(w, r, p)
 }
 
 func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		w.WriteHeader(http.StatusBadRequest)
+		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	var p plant.Plant
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		send500Response(w, r, err)
 		return
 	}
-	p, err := h.PlantService.UpdatePlant(r.Context(), id, p)
+	pl, err := h.PlantService.UpdatePlant(r.Context(), id, p)
 	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		send500Response(w, r, err)
 		return
 	}
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		panic(err)
-	}
+	sendOkResponse(w, r, pl)
 }
 
 func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		w.WriteHeader(http.StatusBadRequest)
+		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	err := h.PlantService.DeletePlant(r.Context(), id)
 	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		send500Response(w, r, err)
 		return
 	}
-	err = json.NewEncoder(w).Encode(Response{Message: "successfully deleted"})
-	if err != nil {
-		panic(err)
-	}
+	res := Response{Message: "successfully deleted"}
+	sendOkResponse(w, r, res)
 }
