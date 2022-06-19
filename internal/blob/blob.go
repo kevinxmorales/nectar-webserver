@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	log "github.com/sirupsen/logrus"
 	"os"
+	"sync"
 )
 
 type S3Response struct {
@@ -28,69 +30,64 @@ func NewS3Session() (*session.Session, error) {
 	})
 	if err != nil {
 		log.Info("Error creating S3 session: ", err.Error())
-		return sess, err
+		return nil, err
 	}
 	log.Info("Successfully created S3 session")
+
 	return sess, nil
 }
 
-func UploadToS3(file string) (S3Response, error) {
+func UploadToBlobStore(fileList []string, ctx context.Context) ([]string, error) {
 	sess, err := NewS3Session()
 	if err != nil {
-		return S3Response{}, err
+		return nil, err
 	}
+	//Set up the S3 bucket
 	bucket := os.Getenv("S3_BUCKET")
 	acl := os.Getenv("AWS_ACL")
-	f, err := os.Open(file)
-	if err != nil {
-		log.Error(err)
-		return S3Response{}, err
-	}
-	defer f.Close()
-	uploader := s3manager.NewUploader(sess)
-	result, err := uploader.Upload(&s3manager.UploadInput{
-		ACL:    aws.String(acl),
-		Bucket: aws.String(bucket),
-		Key:    aws.String(f.Name()),
-		Body:   f,
-	})
-	if err != nil {
-		return S3Response{}, err
-	}
-	log.Info(fmt.Sprintf("Upload result: %+v\n", result))
-	response := S3Response{
-		URL:      result.Location,
-		FileName: file,
-	}
-	return response, nil
-}
 
-func DownloadFromS3(fileName string) (*os.File, error) {
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Info("Error creating temporary file for S3 download: ", err)
-		return file, err
+	//Set up the concurrency
+	//Need wait group and mutex
+	var wg sync.WaitGroup
+	mu := sync.Mutex{}
+
+	// The resulting s3 urls to the files
+	//s3Urls := make([]string, len(fileList))
+	var s3Urls []string
+
+	// Iterate over the local files that need to be updated
+	for _, pathOfFile := range fileList[:] {
+		// Kick off goroutine with thread-safe function to upload to s3
+		wg.Add(1)
+		go func(pathOfFile string, store *session.Session, wg *sync.WaitGroup) {
+			// Defer the
+			defer func() {
+				wg.Done()
+			}()
+			file, _ := os.Open(pathOfFile)
+			defer file.Close()
+			uploader := s3manager.NewUploader(sess)
+			result, err := uploader.UploadWithContext(
+				ctx,
+				&s3manager.UploadInput{
+					ACL:    aws.String(acl),
+					Bucket: aws.String(bucket),
+					Key:    aws.String(file.Name()),
+					Body:   file,
+				})
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			mu.Lock()
+			s3Urls = append(s3Urls, result.Location)
+			mu.Unlock()
+			log.Info(fmt.Sprintf("Upload result: %+v\n", result))
+		}(pathOfFile, sess, &wg)
 	}
-	defer file.Close()
-	sess, err := NewS3Session()
-	if err != nil {
-		return file, err
-	}
-	bucket := os.Getenv("S3_BUCKET")
-	downloader := s3manager.NewDownloader(sess)
-	// number of bytes downloaded or error
-	_, err = downloader.Download(file,
-		&s3.GetObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(fileName),
-		},
-	)
-	if err != nil {
-		log.Info("Error downloading from S3: ", err.Error())
-		return file, err
-	}
-	log.Println("Successfully downloaded")
-	return file, nil
+	// Block until WaitGroup counter is zero, then return the s3 urls
+	wg.Wait()
+	return s3Urls, nil
 }
 
 func DeleteFromS3(fileName string) error {

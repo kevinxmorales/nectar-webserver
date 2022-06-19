@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
@@ -67,7 +66,7 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 			year, month, day := time.Now().Date()
 			hour := time.Now().Hour()
 			minute := time.Now().Minute()
-			newFileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s", year, month, day, hour, minute, uuid.NewV4().String())
+			newFileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s", year, month, day, hour, minute, files[0].Filename)
 			fmt.Println(newFileName)
 			out, err := os.Create(newFileName)
 			defer out.Close()
@@ -100,15 +99,12 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
-	var s3FileNames []string
-	for i := 0; i < len(fileNames); i++ {
-		s3, err := blob.UploadToS3(fileNames[i])
-		if err != nil {
-			panic(err)
-		}
-		s3FileNames = append(s3FileNames, s3.URL)
+	fileUrls, err := blob.UploadToBlobStore(fileNames, r.Context())
+	if err != nil {
+		send500Response(w, r, err)
+		return
 	}
-	sendOkResponse(w, r, s3FileNames)
+	sendOkResponse(w, r, fileUrls)
 }
 
 func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
