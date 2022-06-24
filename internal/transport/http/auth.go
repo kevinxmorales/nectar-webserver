@@ -30,16 +30,15 @@ func JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
-		if validateToken(authHeaderParts[1]) {
-			original(w, r)
-		} else {
+		if !isValidToken(authHeaderParts[1]) {
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
+		original(w, r)
 	}
 }
 
-func validateToken(accessToken string) bool {
+func isValidToken(accessToken string) bool {
 	var signingKey = []byte(os.Getenv("TOKEN_SECRET"))
 	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -48,8 +47,7 @@ func validateToken(accessToken string) bool {
 		return signingKey, nil
 	})
 	if err != nil {
-		log.Info("An error occurred while validating token")
-		log.Error(err)
+		log.Error("An error occurred while validating token", err)
 		return false
 	}
 	return token.Valid
