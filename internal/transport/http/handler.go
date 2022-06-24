@@ -3,10 +3,14 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"time"
@@ -80,28 +84,87 @@ func (h *Handler) Serve() error {
 	return nil
 }
 
-func sendOkResponse(w http.ResponseWriter, r *http.Request, data any) {
+// ParseUrlQueryParams a function to parse url query params. The function accepts a URL and a slice of map keys that
+//are expected in the query parameters. This function returns map that is safe to use with all expected keys in it/**
+func (h *Handler) ParseUrlQueryParams(url *url.URL, paramMapKeys ...string) (map[string]string, error) {
+	params := url.Query()
+	mapValues := make(map[string]string)
+	for _, key := range paramMapKeys {
+		val, ok := params[key]
+		//if key is not present OR the key is present and the value is an empty array
+		if !ok || len(val) < 1 {
+			return nil, errors.New(fmt.Sprintf("key, %s, not found in url query parameters", key))
+		}
+		mapValues[key] = val[0]
+	}
+	return mapValues, nil
+}
+
+func (h *Handler) ParseFilesFromMultiPartFormData(formData *multipart.Form, numberOfFiles int) ([]string, error) {
+	log.Infof("number of files: %d", numberOfFiles)
+	var fileNames []string
+	for index := 0; index < numberOfFiles; index++ {
+		fileName := fmt.Sprintf("image%d", index)
+		files, ok := formData.File[fileName] // grab the filenames
+		// loop through the files one by one
+		err := func() error {
+			if !ok {
+				return errors.New(fmt.Sprintf("file not found: %s", fileName))
+			}
+			//Check if slice is empty
+			if len(files) < 1 {
+				return errors.New(fmt.Sprintf("unable to parse file supplied: %s", fileName))
+			}
+			file, err := files[0].Open()
+			defer file.Close()
+			if err != nil {
+				return err
+			}
+			year, month, day := time.Now().Date()
+			hour := time.Now().Hour()
+			minute := time.Now().Minute()
+			newFileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s", year, month, day, hour, minute, files[0].Filename)
+			fmt.Println(newFileName)
+			out, err := os.Create(newFileName)
+			defer out.Close()
+			if err != nil {
+				return errors.New("unable to create the file for writing")
+			}
+			// file not files[i] !
+			if _, err := io.Copy(out, file); err != nil {
+				return err
+			}
+			fileNames = append(fileNames, newFileName)
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return fileNames, nil
+}
+
+func (h *Handler) SendOkResponse(w http.ResponseWriter, r *http.Request, data any) {
 	log.WithFields(log.Fields{
 		"method": r.Method,
 		"path":   r.URL.Path,
 	}).Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	err := json.NewEncoder(w).Encode(data)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
 		panic(err)
 	}
 }
 
-func sendBadRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
+func (h *Handler) SendBadRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error(err)
-	sendErrorResponse(w, r, http.StatusBadRequest)
+	h.SendErrorResponse(w, r, http.StatusBadRequest)
 }
 
-func send500Response(w http.ResponseWriter, r *http.Request, err error) {
+func (h *Handler) SendServerErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error(err)
-	sendErrorResponse(w, r, http.StatusInternalServerError)
+	h.SendErrorResponse(w, r, http.StatusInternalServerError)
 }
 
-func sendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int) {
+func (h *Handler) SendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int) {
 	log.WithFields(log.Fields{
 		"method": r.Method,
 		"path":   r.URL.Path,
