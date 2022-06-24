@@ -18,7 +18,7 @@ func TestPlantDatabase(t *testing.T) {
 		plantName := "testPlant"
 		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
 			Name:   plantName,
-			UserId: uuid.NewV4().String(),
+			UserID: uuid.NewV4().String(),
 		})
 		assert.NoError(t, err)
 
@@ -32,7 +32,7 @@ func TestPlantDatabase(t *testing.T) {
 		plantName := "testingPlant"
 		p, err := db.AddPlant(context.Background(), plant.Plant{
 			Name:   plantName,
-			UserId: uuid.NewV4().String(),
+			UserID: uuid.NewV4().String(),
 		})
 		assert.NoError(t, err)
 
@@ -51,14 +51,14 @@ func TestPlantDatabase(t *testing.T) {
 		userId := uuid.NewV4().String()
 		p, err := db.AddPlant(context.Background(), plant.Plant{
 			Name:   originalName,
-			UserId: userId,
+			UserID: userId,
 		})
 		assert.NoError(t, err)
 
 		newName := "newPlantName"
 		updatedPlant, err := db.UpdatePlant(context.Background(), p.ID, plant.Plant{
 			Name:   newName,
-			UserId: userId,
+			UserID: userId,
 		})
 		assert.NoError(t, err)
 
@@ -84,7 +84,7 @@ func TestPlantDatabase(t *testing.T) {
 			name := "testPlant"
 			p := plant.Plant{
 				Name:   name,
-				UserId: userID,
+				UserID: userID,
 			}
 			plantList = append(plantList, p)
 		}
@@ -99,7 +99,7 @@ func TestPlantDatabase(t *testing.T) {
 		//insert 1 plant that does not belong to this user
 		notMyPlant, err := db.AddPlant(context.Background(), plant.Plant{
 			Name:   "testPlant2",
-			UserId: uuid.NewV4().String(),
+			UserID: uuid.NewV4().String(),
 		})
 
 		userPlants, err := db.GetPlantsByUserId(context.Background(), userID)
@@ -120,7 +120,7 @@ func TestPlantDatabase(t *testing.T) {
 		userId := uuid.NewV4().String()
 		_, err = db.AddPlant(context.Background(), plant.Plant{
 			Name:   "testPlant",
-			UserId: userId,
+			UserID: userId,
 		})
 		assert.NoError(t, err)
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
@@ -21,8 +22,12 @@ func Run() error {
 		log.Error("FAILED to migrate database", err)
 		return err
 	}
-
-	plantService := plant.NewService(database)
+	blobStoreSession, err := blob.NewBlobStoreSession()
+	if err != nil {
+		log.Error("FAILED to connect to the blob store", err)
+		return err
+	}
+	plantService := plant.NewService(database, blobStoreSession)
 	userService := user.NewService(database)
 	authService := auth.NewService(database)
 	httpHandler := transportHttp.NewHandler(plantService, userService, authService)

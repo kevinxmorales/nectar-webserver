@@ -2,7 +2,9 @@ package plant
 
 import (
 	"context"
+	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"time"
 )
 
@@ -10,10 +12,11 @@ import (
 type Plant struct {
 	ID         string      `json:"id"`
 	Name       string      `json:"name"`
-	UserId     string      `json:"userId"`
+	UserID     string      `json:"userId"`
 	CategoryID string      `json:"categoryId"`
 	Images     []ImageUrls `json:"images"`
 	CreatedAt  time.Time   `json:"createdAt"`
+	FileNames  []string    `json:"-"`
 }
 
 type ImageUrls struct {
@@ -34,13 +37,15 @@ type Store interface {
 // Service - is the struct on which out logic will
 // be built upon
 type Service struct {
-	Store Store
+	Store     Store
+	BlobStore *session.Session
 }
 
 // NewService - returns a pointer to a new service
-func NewService(store Store) *Service {
+func NewService(store Store, blobStoreSession *session.Session) *Service {
 	return &Service{
-		Store: store,
+		Store:     store,
+		BlobStore: blobStoreSession,
 	}
 }
 
@@ -61,7 +66,13 @@ func (s *Service) DeletePlant(ctx context.Context, id string) error {
 	return s.Store.DeletePlant(ctx, id)
 }
 
-func (s *Service) PostPlant(ctx context.Context, newPlant Plant) (*Plant, error) {
+func (s *Service) PostPlant(ctx context.Context, newPlant Plant, images []string) (*Plant, error) {
 	log.Info("attempting to add a new plant")
+	//Upload all plant images to blob store
+	s3Urls, err := blob.UploadToBlobStore2(images, ctx, s.BlobStore)
+	if err != nil {
+		return nil, err
+	}
+	newPlant.FileNames = s3Urls
 	return s.Store.AddPlant(ctx, newPlant)
 }
