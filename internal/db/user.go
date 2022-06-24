@@ -96,11 +96,14 @@ func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error)
 		Password:  hashedPassword,
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Errorf("FAILED to close rows from query %s", query)
+			return
+		}
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("FAILED to insert new user: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("FAILED to close rows: %w", err)
 	}
 	log.Info("leaving AddUser", u)
 	return &u, nil
@@ -132,11 +135,14 @@ func (d *Database) UpdateUser(ctx context.Context, id string, u user.User) (*use
 		Password:  u.Password,
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Errorf("FAILED to close rows from query %s", query)
+			return
+		}
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("FAILED to update user: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("FAILED to close rows: %w", err)
 	}
 	return convertUserRowToUser(userRow), nil
 }
