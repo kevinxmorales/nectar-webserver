@@ -44,95 +44,93 @@ func isValidEmail(email string) bool {
 func (h *Handler) PostUser(w http.ResponseWriter, r *http.Request) {
 	var userRequest PostUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
-		sendBadRequestResponse(w, r, errors.New("unable to decode request"))
+		h.SendBadRequestResponse(w, r, errors.New("unable to decode request"))
 		return
 	}
 	validate := validator.New()
-	err := validate.Struct(userRequest)
-	if err != nil {
-		sendBadRequestResponse(w, r, errors.New("not a valid user object"))
+	if err := validate.Struct(userRequest); err != nil {
+		h.SendBadRequestResponse(w, r, errors.New("not a valid user object"))
 		return
 	}
 	if !isValidEmail(userRequest.Email) {
-		sendBadRequestResponse(w, r, errors.New("not a valid email address format"))
+		h.SendBadRequestResponse(w, r, errors.New("not a valid email address format"))
 		return
 	}
 	convertedUser := convertUserRequestToUser(userRequest)
 	insertedUser, err := h.UserService.AddUser(r.Context(), convertedUser)
 	if err != nil {
-		send500Response(w, r, err)
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
-	sendOkResponse(w, r, insertedUser)
+	h.SendOkResponse(w, r, insertedUser)
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
+		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	usr, err := h.UserService.GetUser(r.Context(), id)
 	if err != nil {
-		send500Response(w, r, err)
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
-	sendOkResponse(w, r, usr)
+	h.SendOkResponse(w, r, usr)
 }
 
 func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	encodedEmail := vars["email"]
 	if encodedEmail == EMPTY {
-		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
+		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	email, err := url.QueryUnescape(encodedEmail)
 	if !isValidEmail(email) {
-		sendBadRequestResponse(w, r, errors.New("not a valid email address format"))
+		h.SendBadRequestResponse(w, r, errors.New("not a valid email address format"))
 		return
 	}
 	usr, err := h.UserService.GetUser(r.Context(), email)
 	if err != nil {
-		send500Response(w, r, err)
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
-	sendOkResponse(w, r, usr)
+	h.SendOkResponse(w, r, usr)
 }
 
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
+		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
 	var usr user.User
 	if err := json.NewDecoder(r.Body).Decode(&usr); err != nil {
-		send500Response(w, r, err)
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
 	usrUpdated, err := h.UserService.UpdateUser(r.Context(), id, usr)
 	if err != nil {
-		send500Response(w, r, err)
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
-	sendOkResponse(w, r, usrUpdated)
+	h.SendOkResponse(w, r, usrUpdated)
 }
 
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == EMPTY {
-		sendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
+		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
 		return
 	}
-	err := h.UserService.DeleteUser(r.Context(), id)
-	if err != nil {
-		send500Response(w, r, err)
+	if err := h.UserService.DeleteUser(r.Context(), id); err != nil {
+		h.SendServerErrorResponse(w, r, err)
 		return
 	}
 	res := Response{Message: "successfully deleted user"}
-	sendOkResponse(w, r, res)
+	h.SendOkResponse(w, r, res)
 }
