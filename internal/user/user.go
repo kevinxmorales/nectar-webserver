@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/util"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/validation"
 	"net/url"
 )
 
@@ -35,8 +35,8 @@ func NewService(store Store) *Service {
 }
 
 func (s *Service) GetUser(ctx context.Context, id string) (*User, error) {
-	if !util.IsValidUUID(id) {
-		return nil, util.CreateInvalidUuidError(id)
+	if !validation.IsValidUUID(id) {
+		return nil, validation.CreateInvalidUuidError(id)
 	}
 	return s.Store.GetUser(ctx, id)
 }
@@ -46,28 +46,28 @@ func (s *Service) GetUserByEmail(ctx context.Context, encodedEmail string) (*Use
 	if err != nil {
 		return nil, err
 	}
-	if !util.IsValidEmail(email) {
-		return nil, util.InvalidEmailFormatError
+	if !validation.IsValidEmail(email) {
+		return nil, validation.InvalidEmailFormatError
 	}
 	return s.Store.GetUserByEmail(ctx, email)
 }
 
 func (s *Service) AddUser(ctx context.Context, usr User) (*User, error) {
-	if !util.IsValidEmail(usr.Email) {
-		return nil, util.InvalidEmailFormatError
+	if !validation.IsValidEmail(usr.Email) {
+		return nil, validation.InvalidEmailFormatError
 	}
 	return s.Store.AddUser(ctx, usr)
 }
 func (s *Service) DeleteUser(ctx context.Context, id string) error {
-	if !util.IsValidUUID(id) {
-		return util.CreateInvalidUuidError(id)
+	if !validation.IsValidUUID(id) {
+		return validation.CreateInvalidUuidError(id)
 	}
 	return s.Store.DeleteUser(ctx, id)
 
 }
 func (s *Service) UpdateUser(ctx context.Context, id string, usr User) (*User, error) {
-	if !util.IsValidUUID(id) {
-		return nil, util.CreateInvalidUuidError(id)
+	if !validation.IsValidUUID(id) {
+		return nil, validation.CreateInvalidUuidError(id)
 	}
 	return s.Store.UpdateUser(ctx, id, usr)
 }
