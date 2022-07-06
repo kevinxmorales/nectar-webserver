@@ -32,6 +32,7 @@ func Run() error {
 	authService := auth.NewService(database)
 	httpHandler := transportHttp.NewHandler(plantService, userService, authService)
 
+	PrintBanner()
 	log.Info("service has successfully started :)")
 	if err := httpHandler.Serve(); err != nil {
 		return err
@@ -41,7 +42,6 @@ func Run() error {
 }
 
 func main() {
-	PrintBanner()
 	if err := Run(); err != nil {
 		log.Error(err)
 	}
