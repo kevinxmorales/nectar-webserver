@@ -31,4 +31,4 @@ INSERT INTO public.plants (plnt_id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_im
 INSERT INTO public.plants (plnt_id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_imgs) VALUES ('6b299c70-df08-482a-bbd6-4f45a9956be6', 'Philo', '4d609f18-de3d-485a-b8b8-23e95b9c76f8', 1, '{"files": [{"fileName": "plant"}]}');
 INSERT INTO public.plants (plnt_id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_imgs) VALUES ('25f51176-377f-40cc-a530-2e60488beca0', 'Ficus 2', '4d609f18-de3d-485a-b8b8-23e95b9c76f8', 5, '{"files": [{"fileName": "ficus"}]}');
 
-INSERT INTO public.users (usr_id, usr_frst_nm, usr_psswrd, usr_email) VALUES ('4d609f18-de3d-485a-b8b8-23e95b9c76f8', 'Kevin', '$2a$04$KEpBH4ODt4u2oZB8M8J.7eZ8ucj91u6HGQ3bw89NyNuaRr9b32Zeu', 'kevin@domain.com');
+INSERT INTO public.users (usr_id, usr_frst_nm, usr_lst_nm, usr_psswrd, usr_email) VALUES ('4d609f18-de3d-485a-b8b8-23e95b9c76f8', 'Kevin', 'Morales','$2a$04$KEpBH4ODt4u2oZB8M8J.7eZ8ucj91u6HGQ3bw89NyNuaRr9b32Zeu', 'kevin@domain.com');
