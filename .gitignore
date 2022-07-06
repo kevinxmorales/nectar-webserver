@@ -23,4 +23,5 @@
 # Go workspace file
 go.work
 
-encrypt.go
+docker-compose-local.yml
+docker-compose-prod.yml
