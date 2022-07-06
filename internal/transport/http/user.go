@@ -8,8 +8,6 @@ import (
 	"github.com/gorilla/mux"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"net/http"
-	"net/mail"
-	"net/url"
 )
 
 type UserService interface {
@@ -36,11 +34,6 @@ func convertUserRequestToUser(u PostUserRequest) user.User {
 	}
 }
 
-func isValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
-}
-
 func (h *Handler) PostUser(w http.ResponseWriter, r *http.Request) {
 	var userRequest PostUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
@@ -50,10 +43,6 @@ func (h *Handler) PostUser(w http.ResponseWriter, r *http.Request) {
 	validate := validator.New()
 	if err := validate.Struct(userRequest); err != nil {
 		h.SendBadRequestResponse(w, r, errors.New("not a valid user object"))
-		return
-	}
-	if !isValidEmail(userRequest.Email) {
-		h.SendBadRequestResponse(w, r, errors.New("not a valid email address format"))
 		return
 	}
 	convertedUser := convertUserRequestToUser(userRequest)
@@ -82,16 +71,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	encodedEmail := vars["email"]
-	if encodedEmail == EMPTY {
-		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
-		return
-	}
-	email, err := url.QueryUnescape(encodedEmail)
-	if !isValidEmail(email) {
-		h.SendBadRequestResponse(w, r, errors.New("not a valid email address format"))
-		return
-	}
+	email := vars["email"]
 	usr, err := h.UserService.GetUser(r.Context(), email)
 	if err != nil {
 		h.SendServerErrorResponse(w, r, err)

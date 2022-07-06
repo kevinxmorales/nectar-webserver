@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/util"
 	"time"
 )
 
@@ -51,18 +52,30 @@ func NewService(store Store, blobStoreSession *session.Session) *Service {
 
 func (s *Service) GetPlant(ctx context.Context, id string) (*Plant, error) {
 	log.Info("Retrieving a plant with id: ", id)
+	if !util.IsValidUUID(id) {
+		return nil, util.CreateInvalidUuidError(id)
+	}
 	return s.Store.GetPlant(ctx, id)
 }
 
 func (s *Service) GetPlantsByUserId(ctx context.Context, id string) ([]Plant, error) {
+	if !util.IsValidUUID(id) {
+		return nil, util.CreateInvalidUuidError(id)
+	}
 	return s.Store.GetPlantsByUserId(ctx, id)
 }
 
-func (s *Service) UpdatePlant(ctx context.Context, ID string, updatedPlant Plant) (*Plant, error) {
-	return s.Store.UpdatePlant(ctx, ID, updatedPlant)
+func (s *Service) UpdatePlant(ctx context.Context, id string, updatedPlant Plant) (*Plant, error) {
+	if !util.IsValidUUID(id) {
+		return nil, util.CreateInvalidUuidError(id)
+	}
+	return s.Store.UpdatePlant(ctx, id, updatedPlant)
 }
 
 func (s *Service) DeletePlant(ctx context.Context, id string) error {
+	if !util.IsValidUUID(id) {
+		return util.CreateInvalidUuidError(id)
+	}
 	return s.Store.DeletePlant(ctx, id)
 }
 

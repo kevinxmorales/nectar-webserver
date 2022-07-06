@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -75,10 +74,6 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == EMPTY {
-		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
-		return
-	}
 	p, err := h.PlantService.GetPlant(r.Context(), id)
 	if err != nil {
 		h.SendServerErrorResponse(w, r, err)
@@ -90,11 +85,6 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == EMPTY {
-		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
-		return
-	}
-	log.Info(fmt.Sprintf("Attempting to get all plants that belong to user with id: %s", id))
 	p, err := h.PlantService.GetPlantsByUserId(r.Context(), id)
 	if err != nil {
 		h.SendServerErrorResponse(w, r, err)
@@ -106,10 +96,6 @@ func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == EMPTY {
-		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
-		return
-	}
 	var p plant.Plant
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		h.SendServerErrorResponse(w, r, err)
@@ -126,10 +112,6 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == EMPTY {
-		h.SendBadRequestResponse(w, r, errors.New("no id was supplied with this request"))
-		return
-	}
 	if err := h.PlantService.DeletePlant(r.Context(), id); err != nil {
 		h.SendServerErrorResponse(w, r, err)
 		return

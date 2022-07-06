@@ -2,6 +2,8 @@ package user
 
 import (
 	"context"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/util"
+	"net/url"
 )
 
 type User struct {
@@ -33,20 +35,39 @@ func NewService(store Store) *Service {
 }
 
 func (s *Service) GetUser(ctx context.Context, id string) (*User, error) {
+	if !util.IsValidUUID(id) {
+		return nil, util.CreateInvalidUuidError(id)
+	}
 	return s.Store.GetUser(ctx, id)
 }
 
-func (s *Service) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+func (s *Service) GetUserByEmail(ctx context.Context, encodedEmail string) (*User, error) {
+	email, err := url.QueryUnescape(encodedEmail)
+	if err != nil {
+		return nil, err
+	}
+	if !util.IsValidEmail(email) {
+		return nil, util.InvalidEmailFormatError
+	}
 	return s.Store.GetUserByEmail(ctx, email)
 }
 
 func (s *Service) AddUser(ctx context.Context, usr User) (*User, error) {
+	if !util.IsValidEmail(usr.Email) {
+		return nil, util.InvalidEmailFormatError
+	}
 	return s.Store.AddUser(ctx, usr)
 }
 func (s *Service) DeleteUser(ctx context.Context, id string) error {
+	if !util.IsValidUUID(id) {
+		return util.CreateInvalidUuidError(id)
+	}
 	return s.Store.DeleteUser(ctx, id)
 
 }
 func (s *Service) UpdateUser(ctx context.Context, id string, usr User) (*User, error) {
+	if !util.IsValidUUID(id) {
+		return nil, util.CreateInvalidUuidError(id)
+	}
 	return s.Store.UpdateUser(ctx, id, usr)
 }
