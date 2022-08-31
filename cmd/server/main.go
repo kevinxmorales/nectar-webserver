@@ -58,7 +58,7 @@ func printBanner() {
 }
 
 func main() {
-	log.Info("starting up application")
+	log.Info("starting up application...")
 	if err := Run(); err != nil {
 		log.Error(err)
 	}
