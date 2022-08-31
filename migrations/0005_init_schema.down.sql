@@ -1,0 +1,1 @@
+ALTER TABLE users DROP COLUMN "usr_name";

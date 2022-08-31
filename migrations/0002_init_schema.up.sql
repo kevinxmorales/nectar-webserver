@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE IF EXISTS users ADD COLUMN "usr_auth_id" text;
+COMMIT;

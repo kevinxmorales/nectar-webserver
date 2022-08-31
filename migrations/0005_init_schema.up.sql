@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE IF EXISTS users ADD COLUMN "usr_name" text;
+COMMIT;
