@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
 	"os"
 )
 
@@ -21,16 +22,34 @@ func NewDatabase() (*Database, error) {
 		os.Getenv("DB_DB"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("SSL_MODE"))
-
 	dbConn, err := sqlx.Connect("postgres", connectionString)
 	if err != nil {
-		return &Database{}, fmt.Errorf("could not connect to the database: %w", err)
+		return nil, fmt.Errorf("sqlx.Connect in NewDatabase failed for %w", err)
 	}
-	return &Database{
-		Client: dbConn,
-	}, nil
+	database := Database{Client: dbConn}
+	return &database, nil
 }
 
 func (d *Database) Ping(ctx context.Context) error {
 	return d.Client.PingContext(ctx)
+}
+
+type SqlRows interface {
+	Close() error
+	Next() bool
+	Scan(dest ...any) error
+}
+
+func closeDbRows(rows SqlRows, query string) {
+	if err := rows.Close(); err != nil {
+		log.Errorf("FAILED to close rows from query %s", query)
+	}
+}
+
+func convertList[T any, U any](inputList []T, convertFunc func(T) U) []U {
+	outputList := make([]U, len(inputList))
+	for i, v := range inputList {
+		outputList[i] = convertFunc(v)
+	}
+	return outputList
 }

@@ -4,6 +4,12 @@ tasks:
   build:
     cmds:
       - go build -o app cmd/server/main.go
+  go:
+    cmds:
+      - go build -o app cmd/server/main.go
+      - ./app
+    env:
+      ENV: develop
   test:
     cmds:
       - go test -v ./...
@@ -12,15 +18,13 @@ tasks:
       - golangci-lint run
   run:
     cmds:
-      - docker-compose up --build
+      - docker-compose -f docker-compose-develop.yml up --build
 
   integration-tests:
     cmds:
       - docker-compose -f docker-compose-for-tests.yml up -d db
-      - cat migrations/0001_init_schema.down.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
-      - cat migrations/0001_init_schema.up.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
       - go test -tags=integration -v ./...
-      - docker-compose down
+      - docker-compose -f docker-compose-for-tests.yml down db
 
     env:
       DB_USERNAME: postgres
@@ -35,10 +39,8 @@ tasks:
   acceptance_tests:
     cmds:
       - docker-compose -f docker-compose-for-tests.yml up -d
-      - cat migrations/0001_init_schema.down.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
-      - cat migrations/0001_init_schema.up.sql | docker exec -i nectar-sql-db-for-tests psql -U postgres -d postgres
       - go test -tags=e2e -v ./...
-      - docker-compose down
+      - docker-compose -f docker-compose-for-tests.yml down
     env:
       DB_USERNAME: postgres
       DB_PASSWORD: pgpassword

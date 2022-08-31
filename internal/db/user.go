@@ -3,146 +3,162 @@ package db
 import (
 	"context"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
-	"golang.org/x/crypto/bcrypt"
+	"strings"
 )
 
 type UserRow struct {
-	ID         string `db:"id"`
+	Id         int    `db:"id"`
+	PlantCount uint   `db:"plant_count"`
+	Name       string `db:"name"`
 	FirstName  string `db:"first_name"`
 	LastName   string `db:"last_name"`
 	Email      string `db:"email"`
 	Password   string `db:"password"`
-	PlantCount uint   `db:"plant_count"`
-}
-
-func hashPassword(password string) (string, error) {
-	// Convert password string to byte slice
-	passwordBytes := []byte(password)
-	// Hash password with Bcrypt's min cost
-	hashedPasswordBytes, err := bcrypt.GenerateFromPassword(passwordBytes, bcrypt.MinCost)
-	return string(hashedPasswordBytes), err
+	Username   string `db:"username"`
+	AuthId     string `db:"auth_id"`
+	ImageUrl   string `db:"image_url"`
 }
 
 func convertUserRowToUser(u UserRow) *user.User {
 	return &user.User{
-		ID:         u.ID,
+		Id:         u.Id,
 		FirstName:  u.FirstName,
 		LastName:   u.LastName,
 		Email:      u.Email,
 		PlantCount: u.PlantCount,
+		Username:   u.Username,
+		AuthId:     u.AuthId,
 	}
 }
 
-func (d *Database) GetUser(ctx context.Context, uuid string) (*user.User, error) {
+func (d *Database) GetUser(ctx context.Context, id int) (*user.User, error) {
+	tag := "db.user.GetUser"
 	query := `SELECT 
-       			usr_id, 
+       			id,
        			usr_frst_nm, 
        			usr_lst_nm, 
        			usr_email, 
        			(select count(*) from plants where plants.plnt_usr_id = $1) as plant_count 
 				FROM users
-				WHERE usr_id = $1`
+				WHERE users.id = $1`
 	var userRow UserRow
-	row := d.Client.QueryRowContext(ctx, query, uuid)
-	err := row.Scan(&userRow.ID, &userRow.FirstName, &userRow.LastName, &userRow.Email, &userRow.PlantCount)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching user by uuid. %w", err)
+	row := d.Client.QueryRowContext(ctx, query, id)
+	if err := row.Scan(&userRow.Id, &userRow.FirstName, &userRow.LastName, &userRow.Email, &userRow.PlantCount); err != nil {
+		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
 	}
 	return convertUserRowToUser(userRow), nil
 }
 
 func (d *Database) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	query := `SELECT usr_id, usr_frst_nm, usr_lst_nm, usr_email
+	tag := "db.user.GetUserByEmail"
+	query := `SELECT id, usr_frst_nm, usr_lst_nm, usr_email
 				FROM users
 				WHERE usr_email = $1`
-	log.Info("in Store.GetUser")
 	var userRow UserRow
 	row := d.Client.QueryRowContext(ctx, query, email)
-	err := row.Scan(&userRow.ID, &userRow.FirstName, &userRow.LastName, &userRow.Email)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching user by email. %w", err)
+	if err := row.Scan(&userRow.Id, &userRow.FirstName, &userRow.LastName, &userRow.Email); err != nil {
+		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
 	}
 	return convertUserRowToUser(userRow), nil
 }
 
-func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error) {
-	query := `INSERT INTO users 
-				(usr_id, 
-				 usr_frst_nm,
-				 usr_lst_nm,
-				 usr_email, 
-				 usr_psswrd) 
-				VALUES 
-				(:id, 
-				 :first_name,
-				 :last_name,
-				 :email, 
-				 :password)`
-	log.Info("attempting to create user")
-
-	hashedPassword, err := hashPassword(u.Password)
-	if err != nil {
-		return nil, fmt.Errorf("FAILED to insert new user: %w", err)
+func (d *Database) GetUserByAuthId(ctx context.Context, email string) (*user.User, error) {
+	tag := "db.user.GetUserByAuthId"
+	query := `SELECT id, usr_frst_nm, usr_lst_nm, usr_email, usr_auth_id, usr_username
+				FROM users
+				WHERE usr_auth_id = $1`
+	var u UserRow
+	row := d.Client.QueryRowContext(ctx, query, email)
+	if err := row.Scan(&u.Id, &u.FirstName, &u.LastName, &u.Email, &u.AuthId, &u.Username); err != nil {
+		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
 	}
-	u.ID = uuid.NewV4().String()
+	return convertUserRowToUser(u), nil
+}
+
+func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error) {
+	tag := "db.user.AddUser"
+	query := `INSERT INTO users 
+				(usr_auth_id,
+				 usr_name,
+				 usr_email, 
+				 usr_username
+				 ) 
+				VALUES 
+				(:auth_id,
+				 :name,
+				 :email, 
+				 :username)
+				RETURNING id`
 	userRow := UserRow{
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		ID:        u.ID,
-		Email:     u.Email,
-		Password:  hashedPassword,
+		Name:     u.Name,
+		Email:    u.Email,
+		AuthId:   u.AuthId,
+		Username: u.Username,
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("FAILED to close rows from query %s", query)
-			return
-		}
-	}()
 	if err != nil {
-		return nil, fmt.Errorf("FAILED to insert new user: %w", err)
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, DuplicateKeyError
+		}
+		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
 	}
-	log.Info("leaving AddUser", u)
+	var userID int
+	for rows.Next() {
+		if err := rows.Scan(&userID); err != nil {
+			return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
+		}
+	}
+	u.Id = userID
 	return &u, nil
 }
 
-func (d *Database) DeleteUser(ctx context.Context, id string) error {
+func (d *Database) DeleteUser(ctx context.Context, id int) error {
+	tag := "db.user.DeleteUser"
 	query := `DELETE FROM users
-				WHERE usr_id = $1`
+				WHERE users.id = $1`
 	_, err := d.Client.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("FAILED to delete user from database: %w", err)
+		return fmt.Errorf("ExecContext in %s failed for %v", tag, err)
 	}
 	return nil
 }
 
-func (d *Database) UpdateUser(ctx context.Context, id string, u user.User) (*user.User, error) {
+func (d *Database) UpdateUser(ctx context.Context, id int, u user.User) (*user.User, error) {
+	tag := "db.user.UpdateUser"
 	query := `UPDATE users 
 				SET 
 					usr_frst_nm = :first_name,
 				    usr_lst_nm = :last_name,
 					usr_email = :email,
-					usr_psswrd = :password
-				WHERE usr_id = :id`
+				    usr_username = :username,
+					usr_image_url = :image_url
+				WHERE users.id = :id`
 	userRow := UserRow{
-		ID:        id,
+		Id:        id,
 		FirstName: u.FirstName,
 		LastName:  u.LastName,
 		Email:     u.Email,
-		Password:  u.Password,
 	}
-	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("FAILED to close rows from query %s", query)
-			return
-		}
-	}()
+	_, err := d.Client.NamedQueryContext(ctx, query, userRow)
 	if err != nil {
-		return nil, fmt.Errorf("FAILED to update user: %w", err)
+		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
 	}
 	return convertUserRowToUser(userRow), nil
+}
+
+func (d *Database) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {
+	tag := "db.user.CheckIfUsernameIsTaken"
+	query := `SELECT exists 
+				(SELECT 1 
+				FROM users 
+				WHERE usr_username = $1 
+				LIMIT 1)`
+	var isUsernameTaken bool
+	row := d.Client.QueryRowContext(ctx, query, username)
+	err := row.Scan(&isUsernameTaken)
+	if err != nil {
+		return false, fmt.Errorf("row.Scan in %s failed for %v", tag, err)
+	}
+	return isUsernameTaken, nil
 }

@@ -12,8 +12,6 @@ services:
       - POSTGRES_PASSWORD=pgpassword
     networks:
       - fullstack_for_tests
-    volumes:
-      - database_postgres_for_tests:/var/lib/postgresql/data
 
   api:
     build: .
@@ -32,9 +30,6 @@ services:
       - db
     networks:
       - fullstack_for_tests
-
-volumes:
-  database_postgres_for_tests:
 
 networks:
   fullstack_for_tests:

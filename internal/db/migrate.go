@@ -11,23 +11,20 @@ import (
 )
 
 func (d *Database) MigrateDB() error {
-	log.Info("migrating the database")
-
 	driver, err := postgres.WithInstance(d.Client.DB, &postgres.Config{})
 	if err != nil {
-		return fmt.Errorf("could not create the postgres driver: %w", err)
+		return fmt.Errorf("postgres.WithInstance in db.MigrateDB failed for %v", err)
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file:///migrations",
+		"file://migrations",
 		"postgres",
 		driver)
 	if err != nil {
-		log.Error(err)
-		return err
+		return fmt.Errorf("migrate.NewWithDatabaseInstance in db.MigrateDB failed for %v", err)
 	}
 	if err := m.Up(); err != nil {
 		if !errors.Is(err, migrate.ErrNoChange) {
-			return fmt.Errorf("could not run up migrations: %w", err)
+			return fmt.Errorf("*migrate.Migrate.Up in db.MigrateDB failed for %v", err)
 		}
 	}
 	log.Info("successfully migrated the database")

@@ -4,11 +4,18 @@ package db
 
 import (
 	"context"
-	uuid "github.com/satori/go.uuid"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	"testing"
 )
+
+var testPlant = plant.Plant{
+	Name:       "testPlant",
+	UserId:     99,
+	CategoryID: "21",
+	FileNames:  []string{"file1.jpg"},
+}
 
 func TestPlantDatabase(t *testing.T) {
 	t.Run("test create plant", func(t *testing.T) {
@@ -16,30 +23,25 @@ func TestPlantDatabase(t *testing.T) {
 		assert.NoError(t, err)
 
 		plantName := "testPlant"
-		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:   plantName,
-			UserID: uuid.NewV4().String(),
-		})
+		insertedPlant, err := db.AddPlant(context.Background(), testPlant)
 		assert.NoError(t, err)
 
-		newPlant, err := db.GetPlant(context.Background(), insertedPlant.ID)
-		assert.Equal(t, plantName, newPlant.Name)
+		newPlant, err := db.GetPlant(context.Background(), insertedPlant.Id)
+		assert.NoError(t, err)
+		newPlantName := newPlant.Name
+		assert.Equal(t, plantName, newPlantName)
 	})
 
 	t.Run("test delete plant", func(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
-		plantName := "testingPlant"
-		p, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:   plantName,
-			UserID: uuid.NewV4().String(),
-		})
+		p, err := db.AddPlant(context.Background(), testPlant)
 		assert.NoError(t, err)
 
-		err = db.DeletePlant(context.Background(), p.ID)
+		err = db.DeletePlant(context.Background(), p.Id)
 		assert.NoError(t, err)
 
-		_, err = db.GetPlant(context.Background(), p.ID)
+		_, err = db.GetPlant(context.Background(), p.Id)
 		assert.Error(t, err)
 	})
 
@@ -47,18 +49,22 @@ func TestPlantDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		originalName := "testingPlant"
-		userId := uuid.NewV4().String()
+		originalName := "testPlant"
+		userId := 66
 		p, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:   originalName,
-			UserID: userId,
+			Name:       originalName,
+			UserId:     userId,
+			CategoryID: "21",
+			FileNames:  []string{"file1.jpg"},
 		})
 		assert.NoError(t, err)
 
 		newName := "newPlantName"
-		updatedPlant, err := db.UpdatePlant(context.Background(), p.ID, plant.Plant{
-			Name:   newName,
-			UserID: userId,
+		updatedPlant, err := db.UpdatePlant(context.Background(), p.Id, plant.Plant{
+			Name:       newName,
+			UserId:     userId,
+			CategoryID: "21",
+			FileNames:  []string{"file1.jpg"},
 		})
 		assert.NoError(t, err)
 
@@ -69,22 +75,23 @@ func TestPlantDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		idNotInDB := uuid.NewV4().String()
-		_, err = db.GetPlant(context.Background(), idNotInDB)
+		_, err = db.GetPlant(context.Background(), 99999)
 		assert.Error(t, err)
 	})
 
 	t.Run("test get plants by user id", func(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
-		userID := uuid.NewV4().String()
 		numPlants := 3
 		var plantList []plant.Plant
+		userID := 1
 		for i := 0; i < numPlants; i++ {
 			name := "testPlant"
 			p := plant.Plant{
-				Name:   name,
-				UserID: userID,
+				Name:       fmt.Sprintf("%s%d", name, i),
+				UserId:     userID,
+				CategoryID: "21",
+				FileNames:  []string{"file1.jpg"},
 			}
 			plantList = append(plantList, p)
 		}
@@ -93,13 +100,15 @@ func TestPlantDatabase(t *testing.T) {
 		for i := 0; i < numPlants; i++ {
 			insertedPlant, err := db.AddPlant(context.Background(), plantList[i])
 			assert.NoError(t, err)
-			plantList[i].ID = insertedPlant.ID
+			plantList[i].Id = insertedPlant.Id
 		}
-
+		differentUserID := 2
 		//insert 1 plant that does not belong to this user
 		notMyPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:   "testPlant2",
-			UserID: uuid.NewV4().String(),
+			Name:       "testPlant2",
+			UserId:     differentUserID,
+			CategoryID: "21",
+			FileNames:  []string{"file1.jpg"},
 		})
 
 		userPlants, err := db.GetPlantsByUserId(context.Background(), userID)
@@ -109,7 +118,7 @@ func TestPlantDatabase(t *testing.T) {
 		// Assert that the array only contains plants that
 		// belong to the user
 		for i := 0; i < numPlants; i++ {
-			assert.NotEqual(t, notMyPlant.ID, plantList[i].ID)
+			assert.NotEqual(t, notMyPlant.Id, plantList[i].Id)
 		}
 	})
 
@@ -117,14 +126,16 @@ func TestPlantDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		userId := uuid.NewV4().String()
+		userId := 10
 		_, err = db.AddPlant(context.Background(), plant.Plant{
-			Name:   "testPlant",
-			UserID: userId,
+			Name:       "testPlant",
+			UserId:     userId,
+			CategoryID: "21",
+			FileNames:  []string{"file1.jpg"},
 		})
 		assert.NoError(t, err)
 
-		otherId := uuid.NewV4().String()
+		otherId := 11
 		plantList, err := db.GetPlantsByUserId(context.Background(), otherId)
 		assert.NoError(t, err)
 		// User has no plants, should return an empty slice

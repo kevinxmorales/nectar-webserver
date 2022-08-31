@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"testing"
@@ -23,9 +22,10 @@ func TestUserDatabase(t *testing.T) {
 			Password:  password,
 		})
 		assert.NoError(t, err)
-		newUser, err := db.GetUser(context.Background(), insertedUser.ID)
+		newUser, err := db.GetUser(context.Background(), insertedUser.Id)
 		assert.Equal(t, firstName, newUser.FirstName)
-		db.DeleteUser(context.Background(), newUser.ID)
+		err = db.DeleteUser(context.Background(), newUser.Id)
+		assert.NoError(t, err)
 	})
 
 	t.Run("test delete user", func(t *testing.T) {
@@ -40,10 +40,10 @@ func TestUserDatabase(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		err = db.DeleteUser(context.Background(), newUser.ID)
+		err = db.DeleteUser(context.Background(), newUser.Id)
 		assert.NoError(t, err)
 
-		_, err = db.GetUser(context.Background(), newUser.ID)
+		_, err = db.GetUser(context.Background(), newUser.Id)
 		assert.Error(t, err)
 	})
 
@@ -60,7 +60,7 @@ func TestUserDatabase(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		newEmail := "kevin@protonmail.com"
-		updatedUser, err := db.UpdateUser(context.Background(), newUser.ID, user.User{
+		updatedUser, err := db.UpdateUser(context.Background(), newUser.Id, user.User{
 			FirstName: newUser.FirstName,
 			LastName:  newUser.LastName,
 			Email:     newEmail,
@@ -69,7 +69,7 @@ func TestUserDatabase(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, newEmail, updatedUser.Email)
-		err = db.DeleteUser(context.Background(), updatedUser.ID)
+		err = db.DeleteUser(context.Background(), updatedUser.Id)
 		assert.NoError(t, err)
 	})
 
@@ -77,7 +77,7 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		idNotInDB := uuid.NewV4().String()
+		idNotInDB := 99999
 		_, err = db.GetUser(context.Background(), idNotInDB)
 		assert.Error(t, err)
 
@@ -99,8 +99,5 @@ func TestUserDatabase(t *testing.T) {
 		//This should fail, expecting an error
 		_, err = db.AddUser(context.Background(), *insertedUser)
 		assert.Error(t, err)
-
-		err = db.DeleteUser(context.Background(), insertedUser.ID)
-		assert.NoError(t, err)
 	})
 }

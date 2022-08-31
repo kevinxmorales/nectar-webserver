@@ -4,29 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
-	"os"
+	"strconv"
 	"time"
 )
 
 type PlantRow struct {
-	ID         string    `db:"id"`
 	PlantName  string    `db:"plant_name"`
-	UserID     string    `db:"user_id"`
 	CategoryID string    `db:"plant_category_id"`
 	Images     Images    `db:"plant_images"`
 	CreatedAt  time.Time `db:"plant_created_at"`
-}
-
-type PlantRowV2 struct {
-	ID         string    `db:"id"`
-	PlantName  string    `db:"plant_name"`
-	UserID     string    `db:"user_id"`
-	CategoryID string    `db:"plant_category_id"`
-	Images     ImagesV2  `db:"plant_images"`
-	CreatedAt  time.Time `db:"plant_created_at"`
+	Id         int       `db:"id"`
+	PlantId    string    `db:"plantId"`
+	UserId     int       `db:"user_id"`
+	Username   string    `db:"user_username"`
 }
 
 type PlantCategory struct {
@@ -36,43 +27,27 @@ type PlantCategory struct {
 	Color string `db:"color"`
 }
 
-type ImagesV2 struct {
-	Files []string `json:"files" db:"files"`
-}
-
 type Images struct {
-	Files []ImageFiles `json:"files" db:"files"`
-}
-
-type ImageFiles struct {
-	FileName string `json:"fileName" db:"fileName"`
-}
-
-func convertPlantRowToPlant2(p PlantRowV2) *plant.Plant {
-	return &plant.Plant{
-		ID:         p.ID,
-		Name:       p.PlantName,
-		UserID:     p.UserID,
-		CategoryID: p.CategoryID,
-		Images:     imageMapper2(p),
-		CreatedAt:  p.CreatedAt,
-	}
+	Files []string `json:"files" db:"files"`
 }
 
 func convertPlantRowToPlant(p PlantRow) *plant.Plant {
 	return &plant.Plant{
-		ID:         p.ID,
+		Id:         p.Id,
+		IdStr:      p.PlantId,
 		Name:       p.PlantName,
-		UserID:     p.UserID,
+		UserId:     p.UserId,
+		Username:   p.Username,
 		CategoryID: p.CategoryID,
 		Images:     imageMapper(p),
 		CreatedAt:  p.CreatedAt,
 	}
 }
 
-func imageMapper2(p PlantRowV2) []plant.ImageUrls {
+func imageMapper(p PlantRow) []plant.ImageUrls {
 	imagesArray := p.Images.Files
-	var imagesUrls []plant.ImageUrls
+	//do not use nil slice declaration
+	imagesUrls := []plant.ImageUrls{}
 	for i := 0; i < len(imagesArray); i++ {
 		var imageUrl plant.ImageUrls
 		fileName := imagesArray[i]
@@ -83,135 +58,120 @@ func imageMapper2(p PlantRowV2) []plant.ImageUrls {
 	return imagesUrls
 }
 
-func imageMapper(p PlantRow) []plant.ImageUrls {
-	baseURL := os.Getenv("FILE_SERVER_URL")
-	imagesArray := p.Images.Files
-	var imagesUrls []plant.ImageUrls
-	for i := 0; i < len(imagesArray); i++ {
-		var imageUrl plant.ImageUrls
-		fileName := imagesArray[i].FileName
-		url := fmt.Sprintf("%s%s_full.jpg", baseURL, fileName)
-		thumbnailUrl := fmt.Sprintf("%s%s_full.jpg", baseURL, fileName)
-		imageUrl.Url = url
-		imageUrl.ThumbnailUrl = thumbnailUrl
-		imagesUrls = append(imagesUrls, imageUrl)
-	}
-	return imagesUrls
-}
-
-func (d *Database) GetPlant(ctx context.Context, uuid string) (*plant.Plant, error) {
-	var pr PlantRowV2
+func (d *Database) GetPlant(ctx context.Context, id int) (*plant.Plant, error) {
+	tag := "db.plant.GetPlant"
+	var pr PlantRow
 	var images string
-	query := `SELECT plnt_id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_urls, plnt_created_at
-				FROM plants 
-				WHERE plnt_id = $1`
-	row := d.Client.QueryRowContext(ctx, query, uuid)
-	if err := row.Scan(&pr.ID, &pr.PlantName, &pr.UserID, &pr.CategoryID, &images, &pr.CreatedAt); err != nil {
-		return nil, fmt.Errorf("error fetching plant by uuid. %w", err)
+	query := `SELECT 
+    				plants.id, 
+    				plants.plnt_nm, 
+    				plants.plnt_usr_id, 
+    				plants.plnt_ctgry_id, 
+    				plants.plnt_urls, 
+    				plants.plnt_created_at, 
+    				users.usr_username
+				FROM plants
+				JOIN users ON plnt_usr_id = users.id
+				WHERE plants.id = $1`
+	row := d.Client.QueryRowContext(ctx, query, id)
+	if err := row.Scan(&pr.Id, &pr.PlantName, &pr.UserId, &pr.CategoryID, &images, &pr.CreatedAt, &pr.Username); err != nil {
+		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
 	}
-	var plantImages ImagesV2
+	var plantImages Images
 	if err := json.Unmarshal([]byte(images), &plantImages); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("json.Unmarshal in %s failed for %v", tag, err)
 	}
 	pr.Images = plantImages
-	return convertPlantRowToPlant2(pr), nil
+	p := convertPlantRowToPlant(pr)
+	return p, nil
 }
 
-func (d *Database) GetPlantsByUserId(ctx context.Context, uuid string) ([]plant.Plant, error) {
-	query := `SELECT plnt_id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_urls, plnt_created_at
+func (d *Database) GetPlantsByUserId(ctx context.Context, id int) ([]plant.Plant, error) {
+	tag := "db.plant.GetPlantsByUserId"
+	query := `SELECT id, plnt_nm, plnt_usr_id, plnt_ctgry_id, plnt_urls, plnt_created_at
 				FROM plants 
 				WHERE plnt_usr_id = $1`
-	rows, err := d.Client.QueryContext(ctx, query, uuid)
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("FAILED to close rows from query %s", query)
-			return
-		}
-	}()
+	rows, err := d.Client.QueryContext(ctx, query, id)
+	defer closeDbRows(rows, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("QueryContext in %s failed for %v", tag, err)
 	}
 	var plantList []plant.Plant
 	for rows.Next() {
-		pr := PlantRowV2{}
+		pr := PlantRow{}
 		var images string
-		if err := rows.Scan(&pr.ID, &pr.PlantName, &pr.UserID, &pr.CategoryID, &images, &pr.CreatedAt); err != nil {
-			return nil, err
+		if err := rows.Scan(&pr.Id, &pr.PlantName, &pr.UserId, &pr.CategoryID, &images, &pr.CreatedAt); err != nil {
+			return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
 		}
-		var plantImages ImagesV2
+		var plantImages Images
 		if err := json.Unmarshal([]byte(images), &plantImages); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("json.Unmarshal in %s failed for %v", tag, err)
 		}
 		pr.Images = plantImages
-		p := convertPlantRowToPlant2(pr)
+		p := convertPlantRowToPlant(pr)
 		plantList = append(plantList, *p)
 	}
 	return plantList, nil
 }
 
 func (d *Database) AddPlant(ctx context.Context, p plant.Plant) (*plant.Plant, error) {
+	tag := "db.plant.AddPlant"
 	query := `INSERT INTO plants (
-                    plnt_id, 
                     plnt_nm, 
                     plnt_usr_id, 
                     plnt_ctgry_id, 
                     plnt_urls) 
-                VALUES ($1, $2, $3, $4, $5)`
-	log.Info("db.AddPlant: Attempting to save plant to database")
-	p.ID = uuid.NewV4().String()
-	pr := PlantRowV2{
-		ID:         p.ID,
-		PlantName:  p.Name,
-		UserID:     p.UserID,
-		CategoryID: p.CategoryID,
-		Images: ImagesV2{
-			Files: p.FileNames,
-		},
+                VALUES ($1, $2, $3, $4) 
+                RETURNING id`
+	images := Images{
+		Files: p.FileNames,
 	}
-	imagesJson, err := json.Marshal(pr.Images)
+	imagesJson, err := json.Marshal(images)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("json.Marshall in %s failed for %v", tag, err)
 	}
-	rows, err := d.Client.QueryContext(ctx, query, pr.ID, pr.PlantName, pr.UserID, pr.CategoryID, imagesJson)
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("FAILED to close rows from query %s", query)
-			return
+	catId, err := strconv.Atoi(p.CategoryID)
+	if err != nil {
+		return nil, fmt.Errorf("strconv.Atoi in %s failed for %v", tag, err)
+	}
+	rows, err := d.Client.QueryContext(ctx, query, p.Name, p.UserId, catId, imagesJson)
+	if err != nil {
+		return nil, fmt.Errorf("QueryContext in %s failed for %v", tag, err)
+	}
+	var plantID int
+	for rows.Next() {
+		if err := rows.Scan(&plantID); err != nil {
+			return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
 		}
-	}()
-	if err != nil {
-		return nil, fmt.Errorf("FAILED to insert plant: %w", err)
 	}
-	return convertPlantRowToPlant2(pr), nil
+	p.Id = plantID
+	return &p, nil
 }
 
-func (d *Database) DeletePlant(ctx context.Context, id string) error {
+func (d *Database) DeletePlant(ctx context.Context, id int) error {
+	tag := "db.plant.DeletePlant"
 	query := `DELETE FROM plants 
-				WHERE plnt_id = $1`
+				WHERE id = $1`
 	if _, err := d.Client.ExecContext(ctx, query, id); err != nil {
-		return fmt.Errorf("FAILED to delete plant from database: %w", err)
+		return fmt.Errorf("ExecContext in %s failed for %v", tag, err)
 	}
 	return nil
 }
 
-func (d *Database) UpdatePlant(ctx context.Context, id string, p plant.Plant) (*plant.Plant, error) {
+func (d *Database) UpdatePlant(ctx context.Context, id int, p plant.Plant) (*plant.Plant, error) {
+	tag := "db.plant.UpdatePlant"
 	query := `UPDATE plants SET
 		plnt_nm = :plant_name
-		WHERE plnt_id = :id`
+		WHERE plants.id = :id`
 	plantRow := PlantRow{
-		ID:        id,
+		Id:        id,
 		PlantName: p.Name,
-		UserID:    p.UserID,
+		UserId:    p.UserId,
 	}
-	rows, err := d.Client.NamedQueryContext(ctx, query, plantRow)
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Errorf("FAILED to close rows from query %s", query)
-			return
-		}
-	}()
+	_, err := d.Client.NamedQueryContext(ctx, query, plantRow)
 	if err != nil {
-		return nil, fmt.Errorf("FAILED to update plant: %w", err)
+		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
 	}
-	return convertPlantRowToPlant(plantRow), nil
+	updatedPlant := convertPlantRowToPlant(plantRow)
+	return updatedPlant, nil
 }

@@ -16,7 +16,7 @@ type Credentials struct {
 }
 
 type Claims struct {
-	ID        string `json:"id"`
+	Id        int    `json:"id"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 	Email     string `json:"email"`
@@ -24,7 +24,7 @@ type Claims struct {
 }
 
 type RefreshClaims struct {
-	ID string `json:"id"`
+	Id int `json:"id"`
 	jwt.StandardClaims
 }
 
@@ -53,7 +53,7 @@ func CreateToken(usr user.User) (*TokenDetails, error) {
 	td := TokenDetails{}
 	expirationTime := time.Now().Add((((1 * time.Hour) * 24) * 7) * 52)
 	claims := &Claims{
-		ID:        usr.ID,
+		Id:        usr.Id,
 		FirstName: usr.FirstName,
 		LastName:  usr.LastName,
 		Email:     usr.Email,
@@ -71,7 +71,7 @@ func CreateToken(usr user.User) (*TokenDetails, error) {
 	}
 	expirationTime = time.Now().Add(time.Hour * 24)
 	refreshClaims := RefreshClaims{
-		ID: usr.ID,
+		Id: usr.Id,
 		StandardClaims: jwt.StandardClaims{
 			// In JWT, the expiry time is expressed as unix milliseconds
 			ExpiresAt: expirationTime.Unix(),

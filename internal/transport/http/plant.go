@@ -9,14 +9,15 @@ import (
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 type PlantService interface {
-	PostPlant(context.Context, plant.Plant, []string) (*plant.Plant, error)
-	GetPlant(context.Context, string) (*plant.Plant, error)
-	GetPlantsByUserId(context.Context, string) ([]plant.Plant, error)
-	UpdatePlant(context.Context, string, plant.Plant) (*plant.Plant, error)
-	DeletePlant(context.Context, string) error
+	PostPlant(ctx context.Context, p plant.Plant, fileNames []string) (*plant.Plant, error)
+	GetPlant(ctx context.Context, id int) (*plant.Plant, error)
+	GetPlantsByUserId(ctx context.Context, id int) ([]plant.Plant, error)
+	UpdatePlant(ctx context.Context, id int, p plant.Plant) (*plant.Plant, error)
+	DeletePlant(ctx context.Context, id int) error
 }
 
 type Response struct {
@@ -57,9 +58,14 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 		h.SendServerErrorResponse(w, r, err)
 		return
 	}
+	userID, err := strconv.Atoi(params[userId])
+	if err != nil {
+		h.SendBadRequestResponse(w, r, err)
+		return
+	}
 	p := plant.Plant{
 		Name:       params[plantName],
-		UserID:     params[userId],
+		UserId:     userID,
 		FileNames:  fileNames,
 		CategoryID: params[categoryId],
 	}
@@ -69,33 +75,56 @@ func (h *Handler) PostPlant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.SendOkResponse(w, r, newPlant)
+	return
 }
 
 func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id := vars["id"]
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		h.SendBadRequestResponse(w, r, err)
+		return
+	}
 	p, err := h.PlantService.GetPlant(r.Context(), id)
 	if err != nil {
 		h.SendServerErrorResponse(w, r, err)
 		return
 	}
 	h.SendOkResponse(w, r, p)
+	return
 }
 
 func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id := vars["id"]
-	p, err := h.PlantService.GetPlantsByUserId(r.Context(), id)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		h.SendBadRequestResponse(w, r, err)
+		return
+	}
+	plantList, err := h.PlantService.GetPlantsByUserId(r.Context(), id)
 	if err != nil {
 		h.SendServerErrorResponse(w, r, err)
 		return
 	}
-	h.SendOkResponse(w, r, p)
+	res := ResponseEntity{
+		Content:    plantList,
+		HttpStatus: http.StatusOK,
+		Messages:   []string{},
+	}
+	h.SendOkResponse(w, r, res)
+	return
 }
 
 func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id := vars["id"]
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		h.SendBadRequestResponse(w, r, err)
+		return
+	}
 	var p plant.Plant
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		h.SendServerErrorResponse(w, r, err)
@@ -107,15 +136,22 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.SendOkResponse(w, r, pl)
+	return
 }
 
 func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id := vars["id"]
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		h.SendBadRequestResponse(w, r, err)
+		return
+	}
 	if err := h.PlantService.DeletePlant(r.Context(), id); err != nil {
 		h.SendServerErrorResponse(w, r, err)
 		return
 	}
 	res := Response{Message: "successfully deleted"}
 	h.SendOkResponse(w, r, res)
+	return
 }

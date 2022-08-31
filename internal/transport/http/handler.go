@@ -16,22 +16,37 @@ import (
 	"time"
 )
 
-const EMPTY = ""
+type ResponseEntity struct {
+	Content    any      `json:"content"`
+	HttpStatus int      `json:"httpStatus"`
+	Messages   []string `json:"messages"`
+}
 
 type Handler struct {
 	Router       *mux.Router
 	UserService  UserService
 	PlantService PlantService
+	CareService  CareService
 	AuthService  AuthService
 	Server       *http.Server
 }
 
-func NewHandler(plantService PlantService, userService UserService, authService AuthService) *Handler {
+// NewHandler - returns a pointer to an http handler
+// Need to give the handler all the different services
+func NewHandler(
+	plantService PlantService,
+	userService UserService,
+	careService CareService,
+	authService AuthService) *Handler {
+
+	//Create the http handler
 	h := &Handler{
 		PlantService: plantService,
 		UserService:  userService,
+		CareService:  careService,
 		AuthService:  authService,
 	}
+
 	h.Router = mux.NewRouter()
 	h.mapRoutes()
 	h.Router.Use(JSONMiddleware)
@@ -46,23 +61,32 @@ func NewHandler(plantService PlantService, userService UserService, authService 
 
 func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "I am alive")
+		message, _ := json.Marshal(Response{Message: "I am alive"})
+		res := string(message[:])
+		fmt.Fprintf(w, res)
 	})
 	// Auth Endpoints
 	h.Router.HandleFunc("/api/v1/auth", h.Login).Methods(http.MethodPost)
 	// Plant Endpoints
 	h.Router.HandleFunc("/api/v1/plant", JWTAuth(h.PostPlant)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.GetPlant)).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/plant/user/{id}", JWTAuth(h.GetPlantsByUserId)).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.GetPlantsByUserId).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
 	// User Endpoints
 	h.Router.HandleFunc("/api/v1/user", h.PostUser).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/user/{id}", JWTAuth(h.GetUser)).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.GetUser).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/auth-id/{id}", h.GetUserByAuthId).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/user/email/{email}", JWTAuth(h.GetUserByEmail)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/user/{id}", JWTAuth(h.UpdateUser)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/user/{id}", JWTAuth(h.DeleteUser)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.CheckIfUsernameIsTaken).Methods(http.MethodGet)
 
+	//Plant Care Log Endpoints
+	h.Router.HandleFunc("/api/v1/plant-care", JWTAuth(h.AddCareLogEntry)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.GetCareLogsEntries).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", JWTAuth(h.UpdateCareLogEntry)).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", JWTAuth(h.DeleteCareLogEntry)).Methods(http.MethodDelete)
 }
 
 func (h *Handler) Serve() error {
@@ -152,16 +176,25 @@ func (h *Handler) SendOkResponse(w http.ResponseWriter, r *http.Request, data an
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		panic(err)
 	}
+	return
+}
+
+func (h *Handler) SendForbiddenResponse(w http.ResponseWriter, r *http.Request, err error) {
+	log.Error(err)
+	h.SendErrorResponse(w, r, http.StatusForbidden)
+	return
 }
 
 func (h *Handler) SendBadRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error(err)
 	h.SendErrorResponse(w, r, http.StatusBadRequest)
+	return
 }
 
 func (h *Handler) SendServerErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
 	log.Error(err)
 	h.SendErrorResponse(w, r, http.StatusInternalServerError)
+	return
 }
 
 func (h *Handler) SendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int) {
@@ -170,4 +203,5 @@ func (h *Handler) SendErrorResponse(w http.ResponseWriter, r *http.Request, stat
 		"path":   r.URL.Path,
 	}).Info(fmt.Sprintf("unsuccessful request, status code: %d", statusCode))
 	w.WriteHeader(statusCode)
+	return
 }

@@ -25,3 +25,5 @@ go.work
 
 docker-compose-develop.yml
 docker-compose-prod.yml
+develop.env
+prod.env
