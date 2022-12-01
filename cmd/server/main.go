@@ -7,17 +7,12 @@ import (
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/env"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 )
 
 func Run() error {
-	log.Info("loading environment variables")
-	if err := env.LoadEnvironment(); err != nil {
-		return fmt.Errorf("FAILED to load environment variables %v", err)
-	}
 	log.Info("attempting to connect to database")
 	database, err := db.NewDatabase()
 	if err != nil {
