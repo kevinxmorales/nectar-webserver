@@ -52,8 +52,10 @@ func NewHandler(
 	h.Router.Use(JSONMiddleware)
 	h.Router.Use(LoggingMiddleware)
 	h.Router.Use(TimeoutMiddleware)
+	port := os.Getenv("PORT")
+	address := fmt.Sprintf("0.0.0.0:%s", port)
 	h.Server = &http.Server{
-		Addr:    "0.0.0.0:8080",
+		Addr:    address,
 		Handler: h.Router,
 	}
 	return h
