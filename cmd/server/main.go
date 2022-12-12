@@ -7,6 +7,7 @@ import (
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/health"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	transportHttp "gitlab.com/kevinmorales/nectar-rest-api/internal/transport/http"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
@@ -32,7 +33,8 @@ func Run() error {
 	userService := user.NewService(database)
 	authService := auth.NewService(database)
 	careService := care.NewService(database)
-	httpHandler := transportHttp.NewHandler(plantService, userService, careService, authService)
+	healthService := health.NewService(database)
+	httpHandler := transportHttp.NewHandler(plantService, userService, careService, authService, healthService)
 
 	printBanner()
 	log.Info("service is ready to start :)")

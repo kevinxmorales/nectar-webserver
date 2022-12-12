@@ -1,13 +1,17 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"image"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -23,12 +27,14 @@ type ResponseEntity struct {
 }
 
 type Handler struct {
-	Router       *mux.Router
-	UserService  UserService
-	PlantService PlantService
-	CareService  CareService
-	AuthService  AuthService
-	Server       *http.Server
+	Router *mux.Router
+
+	AuthService   AuthService
+	CareService   CareService
+	HealthService HealthService
+	PlantService  PlantService
+	UserService   UserService
+	Server        *http.Server
 }
 
 // NewHandler - returns a pointer to an http handler
@@ -37,14 +43,16 @@ func NewHandler(
 	plantService PlantService,
 	userService UserService,
 	careService CareService,
-	authService AuthService) *Handler {
+	authService AuthService,
+	healthService HealthService) *Handler {
 
 	//Create the http handler
 	h := &Handler{
-		PlantService: plantService,
-		UserService:  userService,
-		CareService:  careService,
-		AuthService:  authService,
+		PlantService:  plantService,
+		UserService:   userService,
+		CareService:   careService,
+		AuthService:   authService,
+		HealthService: healthService,
 	}
 
 	h.Router = mux.NewRouter()
@@ -54,6 +62,7 @@ func NewHandler(
 	h.Router.Use(TimeoutMiddleware)
 	port := os.Getenv("PORT")
 	address := fmt.Sprintf("0.0.0.0:%s", port)
+	log.Info("PORT = ", port)
 	h.Server = &http.Server{
 		Addr:    address,
 		Handler: h.Router,
@@ -62,11 +71,7 @@ func NewHandler(
 }
 
 func (h *Handler) mapRoutes() {
-	h.Router.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
-		message, _ := json.Marshal(Response{Message: "I am alive"})
-		res := string(message[:])
-		fmt.Fprintf(w, res)
-	})
+	h.Router.HandleFunc("/alive", h.HealthCheck).Methods(http.MethodGet)
 	// Auth Endpoints
 	h.Router.HandleFunc("/api/v1/auth", h.Login).Methods(http.MethodPost)
 	// Plant Endpoints
@@ -170,6 +175,47 @@ func (h *Handler) ParseFilesFromMultiPartFormData(formData *multipart.Form, numb
 	return fileNames, nil
 }
 
+func (h *Handler) ParseImagesFromRequestBody(request *http.Request, numImages int) ([]image.Image, error) {
+	// Create variables to hold image data
+	var images []image.Image
+
+	// Read the request body
+	body, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the request body into a map
+	var bodyData map[string]interface{}
+	if err := json.Unmarshal(body, &bodyData); err != nil {
+		return nil, err
+	}
+
+	// Iterate over the three images in the request body
+	for i := 0; i < numImages; i++ {
+		// Get the image data from the body
+		imageData := bodyData[fmt.Sprintf("image%d", i)].(string)
+
+		// Decode the base64 image
+		img, err := base64.StdEncoding.DecodeString(imageData)
+		if err != nil {
+			return images, err
+		}
+
+		// Decode the image
+		imgReader := bytes.NewReader(img)
+		imgDecoded, _, err := image.Decode(imgReader)
+		if err != nil {
+			return images, err
+		}
+		// Append the image to the image array
+		images = append(images, imgDecoded)
+	}
+
+	// Return the images
+	return images, nil
+}
+
 func (h *Handler) SendOkResponse(w http.ResponseWriter, r *http.Request, data any) {
 	log.WithFields(log.Fields{
 		"method": r.Method,
@@ -194,7 +240,6 @@ func (h *Handler) SendBadRequestResponse(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *Handler) SendServerErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
-	log.Error(err)
 	h.SendErrorResponse(w, r, http.StatusInternalServerError)
 	return
 }
