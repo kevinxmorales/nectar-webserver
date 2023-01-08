@@ -9,12 +9,12 @@ import (
 )
 
 type LogEntryRow struct {
-	Id            int            `db:"id"`
-	PlantId       int            `db:"plant_id"`
+	Id            string         `db:"id"`
+	PlantId       string         `db:"plant_id"`
 	Notes         sql.NullString `db:"notes"`
 	WasFertilized bool           `db:"was_fertilized"`
 	WasWatered    bool           `db:"was_watered"`
-	Date          time.Time      `db:"pcl_date"`
+	Date          time.Time      `db:"created_at"`
 }
 
 func mapRowsToLogEntries(rows SqlRows) ([]care.LogEntry, error) {
@@ -56,16 +56,22 @@ func convertRowsToLogEntry(row LogEntryRow) care.LogEntry {
 	}
 }
 
-func (d *Database) GetCareLogsEntries(ctx context.Context, plantId int) ([]care.LogEntry, error) {
-	query := `SELECT id, pcl_plnt_id, pcl_notes, pcl_was_fertilized, pcl_was_watered, pcl_date
-				FROM plant_care_log
-				WHERE pcl_plnt_id = $1
-				ORDER BY pcl_date`
+func (d *Database) GetCareLogsEntries(ctx context.Context, plantId string) ([]care.LogEntry, error) {
+	query := `SELECT 
+    			id, 
+    			plant_id, 
+    			notes, 
+    			was_fertilized, 
+    			was_watered, 
+    			created_at
+				FROM care_log
+				WHERE plant_id = $1
+				ORDER BY created_at`
 	rows, err := d.Client.QueryContext(ctx, query, plantId)
-	defer closeDbRows(rows, query)
 	if err != nil {
 		return nil, fmt.Errorf("QueryContext in db.care.GetCareLogsEntries for %v", err)
 	}
+	defer closeDbRows(rows, query)
 	entries, err := mapRowsToLogEntries(rows)
 	if err != nil {
 		return nil, fmt.Errorf("mapRowsToLogEntries in db.care.GetCareLogsEntries for %v", err)
@@ -74,29 +80,28 @@ func (d *Database) GetCareLogsEntries(ctx context.Context, plantId int) ([]care.
 }
 
 func (d *Database) AddCareLogEntry(ctx context.Context, entry care.LogEntry) (*care.LogEntry, error) {
-	query := `INSERT INTO plant_care_log
-				(pcl_plnt_id, 
-				pcl_notes, 
-				pcl_was_watered, 
-				pcl_was_fertilized)
+	query := `INSERT INTO care_log
+				(plant_id, 
+				notes, 
+				was_watered, 
+				was_fertilized)
 				VALUES 
 					(:plant_id,
 					:notes,
 					:was_watered,
 					:was_fertilized)
-				RETURNING id, pcl_plnt_id, pcl_notes, pcl_was_fertilized, pcl_was_watered, pcl_date`
+				RETURNING id, plant_id, notes, was_fertilized, was_watered, created_at`
 	row := LogEntryRow{
 		PlantId:       entry.PlantId,
-		Date:          entry.Date,
 		Notes:         sql.NullString{String: entry.Notes, Valid: true},
 		WasWatered:    entry.WasWatered,
 		WasFertilized: entry.WasFertilized,
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, row)
-	defer closeDbRows(rows, query)
 	if err != nil {
 		return nil, fmt.Errorf("NamedQueryContext in db.care.AddCareLogEntry failed for %v", err)
 	}
+	defer closeDbRows(rows, query)
 	logEntry, err := mapRowsToLogEntry(rows)
 	if err != nil {
 		return nil, fmt.Errorf("mapRowsToLogEntry in db.care.AddCareLogEntry failed for %v", err)
@@ -104,8 +109,8 @@ func (d *Database) AddCareLogEntry(ctx context.Context, entry care.LogEntry) (*c
 	return logEntry, nil
 }
 
-func (d *Database) DeleteCareLogEntry(ctx context.Context, logEntryId int) error {
-	query := `DELETE FROM plant_care_log
+func (d *Database) DeleteCareLogEntry(ctx context.Context, logEntryId string) error {
+	query := `DELETE FROM care_log
 				WHERE id = $1`
 	if _, err := d.Client.ExecContext(ctx, query, logEntryId); err != nil {
 		return fmt.Errorf("ExecContext in db.care.DeleteCareLogEntry failed for %v", err)
@@ -113,14 +118,14 @@ func (d *Database) DeleteCareLogEntry(ctx context.Context, logEntryId int) error
 	return nil
 }
 
-func (d *Database) UpdateCareLogEntry(ctx context.Context, logEntryId int, entry care.LogEntry) (*care.LogEntry, error) {
-	query := `UPDATE plant_care_log 
+func (d *Database) UpdateCareLogEntry(ctx context.Context, logEntryId string, entry care.LogEntry) (*care.LogEntry, error) {
+	query := `UPDATE care_log 
 				SET 
-				pcl_notes = :notes,
-				pcl_was_watered = :was_watered,
-				pcl_was_fertilized = :was_fertilized
+				notes = :notes,
+				was_watered = :was_watered,
+				was_fertilized = :was_fertilized
 				WHERE id = :id
-				RETURNING id, pcl_plnt_id, pcl_notes, pcl_was_fertilized, pcl_was_watered, pcl_date`
+				RETURNING id, plant_id, notes, was_fertilized, was_watered, created_at`
 	row := LogEntryRow{
 		Id:            logEntryId,
 		Notes:         sql.NullString{String: entry.Notes, Valid: true},
@@ -132,6 +137,7 @@ func (d *Database) UpdateCareLogEntry(ctx context.Context, logEntryId int, entry
 	if err != nil {
 		return nil, fmt.Errorf("NamedQueryContext in db.care.UpdateCareLogEntry failed for %v", err)
 	}
+	defer closeDbRows(rows, query)
 	updatedEntry, err := mapRowsToLogEntry(rows)
 	if err != nil {
 		return nil, fmt.Errorf("mapRowsToLogEntry in db.care.UpdateCareLogEntry failed for %v", err)

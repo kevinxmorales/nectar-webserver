@@ -2,36 +2,24 @@ package auth
 
 import (
 	"context"
+	firebase "firebase.google.com/go/v4"
+	firebaseAuth "firebase.google.com/go/v4/auth"
 	"fmt"
-	"github.com/golang-jwt/jwt"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
-	"golang.org/x/crypto/bcrypt"
-	"os"
-	"time"
+	"google.golang.org/api/option"
 )
 
-type Credentials struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type Claims struct {
-	Id        int    `json:"id"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Email     string `json:"email"`
-	jwt.StandardClaims
-}
-
-type RefreshClaims struct {
-	Id int `json:"id"`
-	jwt.StandardClaims
-}
-
-// TokenDetails For storing in Redis
-type TokenDetails struct {
-	AccessToken  string
-	RefreshToken string
+func SetUpAuthClient() (*firebaseAuth.Client, error) {
+	opt := option.WithCredentialsFile("serviceAccountKey.json")
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing firebase auth: %v", err)
+	}
+	authClient, err := app.Auth(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error initializing firebase auth: %v", err)
+	}
+	return authClient, nil
 }
 
 type Store interface {
@@ -39,70 +27,18 @@ type Store interface {
 }
 
 type Service struct {
-	Store Store
+	Store      Store
+	AuthClient *firebaseAuth.Client
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store) *Service {
+func NewService(store Store, authClient *firebaseAuth.Client) *Service {
 	return &Service{
-		Store: store,
+		Store:      store,
+		AuthClient: authClient,
 	}
 }
 
-func CreateToken(usr user.User) (*TokenDetails, error) {
-	td := TokenDetails{}
-	expirationTime := time.Now().Add((((1 * time.Hour) * 24) * 7) * 52)
-	claims := &Claims{
-		Id:        usr.Id,
-		FirstName: usr.FirstName,
-		LastName:  usr.LastName,
-		Email:     usr.Email,
-		StandardClaims: jwt.StandardClaims{
-			// In JWT, the expiry time is expressed as unix milliseconds
-			ExpiresAt: expirationTime.Unix(),
-		},
-	}
-	// Declare the token with the algorithm used for signing, and the claims
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	// Create the JWT string
-	accessTokenSigned, err := accessToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
-	if err != nil {
-		return nil, err
-	}
-	expirationTime = time.Now().Add(time.Hour * 24)
-	refreshClaims := RefreshClaims{
-		Id: usr.Id,
-		StandardClaims: jwt.StandardClaims{
-			// In JWT, the expiry time is expressed as unix milliseconds
-			ExpiresAt: expirationTime.Unix(),
-		},
-	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenSigned, err := refreshToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
-	if err != nil {
-		return nil, err
-	}
-
-	td.AccessToken = accessTokenSigned
-	td.RefreshToken = refreshTokenSigned
-	return &td, nil
-}
-
-// Check if two passwords do not match using Bcrypt's CompareHashAndPassword
-// return nil on success and an error on failure
-func passwordsDoNotMatch(hashedPassword, currPassword string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(currPassword))
-	return err != nil
-}
-
-func (s *Service) Login(ctx context.Context, email string, givenPassword string) (*TokenDetails, error) {
-	// Get the expected password from our in memory map
-	usr, err := s.Store.GetCredentialsByEmail(ctx, email)
-	if err != nil {
-		return nil, err
-	}
-	if passwordsDoNotMatch(usr.Password, givenPassword) {
-		return nil, fmt.Errorf("unauthorized")
-	}
-	return CreateToken(usr)
+func (s *Service) VerifyIDToken(ctx context.Context, token string) (*firebaseAuth.Token, error) {
+	return s.AuthClient.VerifyIDToken(ctx, token)
 }

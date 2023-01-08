@@ -7,7 +7,7 @@ import (
 )
 
 type UserRowWithCreds struct {
-	Id        int
+	Id        string
 	FirstName string
 	LastName  string
 	Email     string
@@ -16,11 +16,9 @@ type UserRowWithCreds struct {
 
 func convertUserRowWithCredsToUser(row UserRowWithCreds) user.User {
 	return user.User{
-		Id:        row.Id,
-		FirstName: row.FirstName,
-		LastName:  row.LastName,
-		Email:     row.Email,
-		Password:  row.Password,
+		Id: row.Id,
+
+		Email: row.Email,
 	}
 }
 

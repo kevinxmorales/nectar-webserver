@@ -59,13 +59,17 @@ func UploadToBlobStore(fileList []string, ctx context.Context, sess *session.Ses
 			defer func() {
 				wg.Done()
 			}()
-			file, _ := os.Open(pathOfFile)
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
+			file, err := os.Open(pathOfFile)
+			if err != nil {
+				log.Error(err)
+				s3Errors[i] = err
+				return
+			}
+			defer func() {
+				if err := file.Close(); err != nil {
 					log.Error(err)
 				}
-			}(file)
+			}()
 			uploader := s3manager.NewUploader(sess)
 			result, err := uploader.UploadWithContext(
 				ctx,

@@ -20,10 +20,9 @@ import (
 	"time"
 )
 
-type ResponseEntity struct {
-	Content    any      `json:"content"`
-	HttpStatus int      `json:"httpStatus"`
-	Messages   []string `json:"messages"`
+type responseEntity struct {
+	Content any    `json:"content"`
+	Message string `json:"message"`
 }
 
 type Handler struct {
@@ -37,7 +36,7 @@ type Handler struct {
 	Server        *http.Server
 }
 
-// NewHandler - returns a pointer to an http handler
+// NewHandler - returns a pointer to a http handler
 // Need to give the handler all the different services
 func NewHandler(
 	plantService PlantService,
@@ -62,7 +61,6 @@ func NewHandler(
 	h.Router.Use(TimeoutMiddleware)
 	port := os.Getenv("PORT")
 	address := fmt.Sprintf("0.0.0.0:%s", port)
-	log.Info("PORT = ", port)
 	h.Server = &http.Server{
 		Addr:    address,
 		Handler: h.Router,
@@ -71,29 +69,28 @@ func NewHandler(
 }
 
 func (h *Handler) mapRoutes() {
-	h.Router.HandleFunc("/alive", h.HealthCheck).Methods(http.MethodGet)
+	h.Router.HandleFunc("/alive", h.healthCheck).Methods(http.MethodGet)
 	// Auth Endpoints
 	h.Router.HandleFunc("/api/v1/auth", h.Login).Methods(http.MethodPost)
 	// Plant Endpoints
-	h.Router.HandleFunc("/api/v1/plant", JWTAuth(h.PostPlant)).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.GetPlant)).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant", h.JWTAuth(h.addPlant)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.GetPlant)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.GetPlantsByUserId).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
-	h.Router.HandleFunc("/api/v1/plant/{id}", JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
 	// User Endpoints
-	h.Router.HandleFunc("/api/v1/user", h.PostUser).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/user/{id}", h.GetUser).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/user/auth-id/{id}", h.GetUserByAuthId).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/user/email/{email}", JWTAuth(h.GetUserByEmail)).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/user/{id}", JWTAuth(h.UpdateUser)).Methods(http.MethodPut)
-	h.Router.HandleFunc("/api/v1/user/{id}", JWTAuth(h.DeleteUser)).Methods(http.MethodDelete)
-	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.CheckIfUsernameIsTaken).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user", h.createUser).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.getUser).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.getUserById).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.updateUser).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.deleteUser)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.checkIfUsernameIsTaken).Methods(http.MethodGet)
 
 	//Plant Care Log Endpoints
-	h.Router.HandleFunc("/api/v1/plant-care", JWTAuth(h.AddCareLogEntry)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant-care", h.JWTAuth(h.AddCareLogEntry)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.GetCareLogsEntries).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/plant-care/{id}", JWTAuth(h.UpdateCareLogEntry)).Methods(http.MethodPut)
-	h.Router.HandleFunc("/api/v1/plant-care/{id}", JWTAuth(h.DeleteCareLogEntry)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.UpdateCareLogEntry)).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.DeleteCareLogEntry)).Methods(http.MethodDelete)
 }
 
 func (h *Handler) Serve() error {
@@ -216,39 +213,8 @@ func (h *Handler) ParseImagesFromRequestBody(request *http.Request, numImages in
 	return images, nil
 }
 
-func (h *Handler) SendOkResponse(w http.ResponseWriter, r *http.Request, data any) {
-	log.WithFields(log.Fields{
-		"method": r.Method,
-		"path":   r.URL.Path,
-	}).Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+func (h *Handler) encodeJsonResponse(w *http.ResponseWriter, res responseEntity) {
+	if err := json.NewEncoder(*w).Encode(res); err != nil {
 		panic(err)
 	}
-	return
-}
-
-func (h *Handler) SendForbiddenResponse(w http.ResponseWriter, r *http.Request, err error) {
-	log.Error(err)
-	h.SendErrorResponse(w, r, http.StatusForbidden)
-	return
-}
-
-func (h *Handler) SendBadRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
-	log.Error(err)
-	h.SendErrorResponse(w, r, http.StatusBadRequest)
-	return
-}
-
-func (h *Handler) SendServerErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
-	h.SendErrorResponse(w, r, http.StatusInternalServerError)
-	return
-}
-
-func (h *Handler) SendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int) {
-	log.WithFields(log.Fields{
-		"method": r.Method,
-		"path":   r.URL.Path,
-	}).Info(fmt.Sprintf("unsuccessful request, status code: %d", statusCode))
-	w.WriteHeader(statusCode)
-	return
 }

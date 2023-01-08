@@ -1,0 +1,3 @@
+ALTER TABLE nectar_users
+DROP COLUMN account_creation_date,
+DROP COLUMN account_deletion_date

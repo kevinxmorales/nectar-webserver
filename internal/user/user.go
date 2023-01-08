@@ -2,85 +2,109 @@ package user
 
 import (
 	"context"
+	firebaseAuth "firebase.google.com/go/v4/auth"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/validation"
-	"net/url"
+	"strings"
 )
 
+type NewUserRequest struct {
+	Name     string `json:"name"`
+	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type UpdateUserRequest struct {
+	Name     string `json:"name" validate:"required"`
+	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required"`
+	ImageUrl string `json:"imageUrl" validate:"required"`
+}
+
 type User struct {
-	Id         int    `json:"id"`
-	PlantCount uint   `json:"plantCount"`
-	Name       string `json:"name"`
-	FirstName  string `json:"firstName"`
-	LastName   string `json:"lastName"`
-	Email      string `json:"email"`
-	Password   string `json:"-"`
-	Username   string `json:"username"`
-	AuthId     string `json:"authId"`
-	ImageUrl   string `json:"image_url"`
-	Following  []int  `json:"following"`
+	Id         string   `json:"id"`
+	PlantCount uint     `json:"plantCount"`
+	Name       string   `json:"name"`
+	Email      string   `json:"email"`
+	Username   string   `json:"username"`
+	ImageUrl   string   `json:"image_url"`
+	Following  []string `json:"following"`
 }
 
 type Store interface {
-	GetUser(ctx context.Context, id int) (*User, error)
-	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	GetUserByAuthId(ctx context.Context, firebaseId string) (*User, error)
+	GetUser(ctx context.Context, id string) (*User, error)
+	GetUserById(ctx context.Context, id string) (*User, error)
 	AddUser(ctx context.Context, u User) (*User, error)
-	DeleteUser(ctx context.Context, id int) error
-	UpdateUser(ctx context.Context, id int, u User) (*User, error)
+	DeleteUser(ctx context.Context, id string) error
+	UpdateUser(ctx context.Context, id string, u User) (*User, error)
 	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
 }
 
 type Service struct {
-	Store Store
+	Store      Store
+	AuthClient *firebaseAuth.Client
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store) *Service {
+func NewService(store Store, authClient *firebaseAuth.Client) *Service {
 	return &Service{
-		Store: store,
+		Store:      store,
+		AuthClient: authClient,
 	}
 }
 
-func (s *Service) GetUser(ctx context.Context, id int) (*User, error) {
+func (s *Service) GetUser(ctx context.Context, id string) (*User, error) {
 	return s.Store.GetUser(ctx, id)
 }
 
-func (s *Service) GetUserByEmail(ctx context.Context, encodedEmail string) (*User, error) {
-	tag := "user.GetUserByEmail"
-	email, err := url.QueryUnescape(encodedEmail)
-	if err != nil {
-		return nil, fmt.Errorf("url.QueryUnescape in %s failed for %v", tag, err)
-	}
-	if err := validation.IsValidEmail(email); err != nil {
-		return nil, fmt.Errorf("email validation for email %s in %s failed for %v", email, tag, err)
-	}
-	return s.Store.GetUserByEmail(ctx, email)
-}
-
-func (s *Service) GetUserByAuthId(ctx context.Context, firebaseId string) (*User, error) {
-	tag := "user.GetUserByAuthId"
-	u, err := s.Store.GetUserByAuthId(ctx, firebaseId)
+func (s *Service) GetUserById(ctx context.Context, id string) (*User, error) {
+	tag := "user.GetUserById"
+	u, err := s.Store.GetUserById(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("Store.GetUserByAuthId in %s failed for %v", tag, err)
 	}
-	u.Following = []int{}
+	u.Following = []string{}
 	return u, nil
 }
 
-func (s *Service) AddUser(ctx context.Context, usr User) (*User, error) {
+func (s *Service) AddUser(ctx context.Context, u NewUserRequest) (*User, error) {
 	tag := "user.AddUser"
-	if err := validation.IsValidEmail(usr.Email); err != nil {
-		return nil, fmt.Errorf("email validation for email %s in %s, failed for %v", usr.Email, tag, err)
+	if err := validation.IsValidEmail(u.Email); err != nil {
+		return nil, fmt.Errorf("email validation for email %s in %s, failed for %v", u.Email, tag, err)
 	}
-	return s.Store.AddUser(ctx, usr)
+	params := (&firebaseAuth.UserToCreate{}).
+		UID(uuid.NewV4().String()).
+		Email(u.Email).
+		EmailVerified(false).
+		Password(u.Password).
+		Disabled(false)
+	firebaseUser, err := s.AuthClient.CreateUser(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	newUser := User{
+		Id:       firebaseUser.UID,
+		Name:     u.Name,
+		Email:    u.Email,
+		Username: strings.Split(u.Email, "@")[0],
+	}
+	return s.Store.AddUser(ctx, newUser)
 }
-func (s *Service) DeleteUser(ctx context.Context, id int) error {
+func (s *Service) DeleteUser(ctx context.Context, id string) error {
 	return s.Store.DeleteUser(ctx, id)
 
 }
-func (s *Service) UpdateUser(ctx context.Context, id int, usr User) (*User, error) {
-	return s.Store.UpdateUser(ctx, id, usr)
+func (s *Service) UpdateUser(ctx context.Context, id string, usr UpdateUserRequest) (*User, error) {
+	u := User{
+		Id:       id,
+		Username: usr.Username,
+		Name:     usr.Name,
+		ImageUrl: usr.ImageUrl,
+		Email:    usr.Email,
+	}
+	return s.Store.UpdateUser(ctx, id, u)
 }
 
 func (s *Service) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {

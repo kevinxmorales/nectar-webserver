@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -16,12 +17,9 @@ func JSONMiddleware(next http.Handler) http.Handler {
 }
 
 func LoggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.WithFields(log.Fields{
-			"method": r.Method,
-			"path":   r.URL.Path,
-		}).Info("handling request")
 
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Info(fmt.Sprintf("handling request | method=%s | path=%s", r.Method, r.URL.Path))
 		next.ServeHTTP(w, r)
 	})
 }

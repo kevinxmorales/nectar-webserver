@@ -2,98 +2,69 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"strings"
 )
 
 type UserRow struct {
-	Id         int    `db:"id"`
-	PlantCount uint   `db:"plant_count"`
-	Name       string `db:"name"`
-	FirstName  string `db:"first_name"`
-	LastName   string `db:"last_name"`
-	Email      string `db:"email"`
-	Password   string `db:"password"`
-	Username   string `db:"username"`
-	AuthId     string `db:"auth_id"`
-	ImageUrl   string `db:"image_url"`
+	Id         string         `db:"id"`
+	PlantCount uint           `db:"plant_count"`
+	Name       sql.NullString `db:"name"`
+	Email      string         `db:"email"`
+	Username   string         `db:"username"`
+	ImageUrl   sql.NullString `db:"profile_image"`
 }
 
 func convertUserRowToUser(u UserRow) *user.User {
 	return &user.User{
 		Id:         u.Id,
-		FirstName:  u.FirstName,
-		LastName:   u.LastName,
 		Email:      u.Email,
 		PlantCount: u.PlantCount,
 		Username:   u.Username,
-		AuthId:     u.AuthId,
+		Name:       u.Name.String,
+		ImageUrl:   u.ImageUrl.String,
 	}
 }
 
-func (d *Database) GetUser(ctx context.Context, id int) (*user.User, error) {
-	tag := "db.user.GetUser"
+func (d *Database) GetUserById(ctx context.Context, id string) (*user.User, error) {
+	tag := "db.user.GetUserById"
 	query := `SELECT 
-       			id,
-       			usr_frst_nm, 
-       			usr_lst_nm, 
-       			usr_email, 
-       			(select count(*) from plants where plants.plnt_usr_id = $1) as plant_count 
-				FROM users
-				WHERE users.id = $1`
-	var userRow UserRow
-	row := d.Client.QueryRowContext(ctx, query, id)
-	if err := row.Scan(&userRow.Id, &userRow.FirstName, &userRow.LastName, &userRow.Email, &userRow.PlantCount); err != nil {
-		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
+    				nectar_users.id, 
+    				nectar_users.first_name as name, 
+    				nectar_users.email,
+    				nectar_users.username,
+    				nectar_users.profile_image
+				FROM nectar_users
+				WHERE nectar_users.id = $1`
+	var rows []UserRow
+	if err := d.Client.SelectContext(ctx, &rows, query, id); err != nil {
+		return nil, fmt.Errorf("sqlx.SelectContext in %s failed for %v", tag, err)
 	}
-	return convertUserRowToUser(userRow), nil
-}
-
-func (d *Database) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	tag := "db.user.GetUserByEmail"
-	query := `SELECT id, usr_frst_nm, usr_lst_nm, usr_email
-				FROM users
-				WHERE usr_email = $1`
-	var userRow UserRow
-	row := d.Client.QueryRowContext(ctx, query, email)
-	if err := row.Scan(&userRow.Id, &userRow.FirstName, &userRow.LastName, &userRow.Email); err != nil {
-		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no user with the given auth id: %s", id)
 	}
-	return convertUserRowToUser(userRow), nil
-}
-
-func (d *Database) GetUserByAuthId(ctx context.Context, email string) (*user.User, error) {
-	tag := "db.user.GetUserByAuthId"
-	query := `SELECT id, usr_frst_nm, usr_lst_nm, usr_email, usr_auth_id, usr_username
-				FROM users
-				WHERE usr_auth_id = $1`
-	var u UserRow
-	row := d.Client.QueryRowContext(ctx, query, email)
-	if err := row.Scan(&u.Id, &u.FirstName, &u.LastName, &u.Email, &u.AuthId, &u.Username); err != nil {
-		return nil, fmt.Errorf("QueryRowContext in %s failed for %v", tag, err)
-	}
-	return convertUserRowToUser(u), nil
+	return convertUserRowToUser(rows[0]), nil
 }
 
 func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error) {
 	tag := "db.user.AddUser"
-	query := `INSERT INTO users 
-				(usr_auth_id,
-				 usr_name,
-				 usr_email, 
-				 usr_username
-				 ) 
+	query := `INSERT INTO nectar_users 
+				(id,
+				 email,
+				 first_name,
+				 username) 
 				VALUES 
-				(:auth_id,
-				 :name,
-				 :email, 
+				(:id,
+				 :email,
+				 :name, 
 				 :username)
 				RETURNING id`
 	userRow := UserRow{
-		Name:     u.Name,
+		Name:     sql.NullString{String: u.Name, Valid: true},
 		Email:    u.Email,
-		AuthId:   u.AuthId,
+		Id:       u.Id,
 		Username: u.Username,
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
@@ -103,7 +74,8 @@ func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error)
 		}
 		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
 	}
-	var userID int
+	defer closeDbRows(rows, query)
+	var userID string
 	for rows.Next() {
 		if err := rows.Scan(&userID); err != nil {
 			return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
@@ -113,46 +85,35 @@ func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error)
 	return &u, nil
 }
 
-func (d *Database) DeleteUser(ctx context.Context, id int) error {
-	tag := "db.user.DeleteUser"
-	query := `DELETE FROM users
-				WHERE users.id = $1`
-	_, err := d.Client.ExecContext(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("ExecContext in %s failed for %v", tag, err)
-	}
-	return nil
-}
-
-func (d *Database) UpdateUser(ctx context.Context, id int, u user.User) (*user.User, error) {
+func (d *Database) UpdateUser(ctx context.Context, id string, u user.User) (*user.User, error) {
 	tag := "db.user.UpdateUser"
-	query := `UPDATE users 
-				SET 
-					usr_frst_nm = :first_name,
-				    usr_lst_nm = :last_name,
-					usr_email = :email,
-				    usr_username = :username,
-					usr_image_url = :image_url
-				WHERE users.id = :id`
-	userRow := UserRow{
-		Id:        id,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		Email:     u.Email,
+	query := `UPDATE nectar_users
+					SET
+						first_name = $1,
+					    username = $2,
+					    email = $3,
+					    profile_image = $4
+					WHERE nectar_users.id = $5
+					RETURNING
+						nectar_users.id, 
+						nectar_users.first_name as name, 
+						nectar_users.email,
+						nectar_users.username,
+						nectar_users.profile_image`
+	row := d.Client.QueryRowContext(ctx, query, u.Name, u.Username, u.Email, u.ImageUrl, id)
+	var ur UserRow
+	if err := row.Scan(&ur.Id, &ur.Name, &ur.Email, &ur.Username, &ur.ImageUrl); err != nil {
+		return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
 	}
-	_, err := d.Client.NamedQueryContext(ctx, query, userRow)
-	if err != nil {
-		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
-	}
-	return convertUserRowToUser(userRow), nil
+	return convertUserRowToUser(ur), nil
 }
 
 func (d *Database) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {
 	tag := "db.user.CheckIfUsernameIsTaken"
 	query := `SELECT exists 
 				(SELECT 1 
-				FROM users 
-				WHERE usr_username = $1 
+				FROM nectar_users 
+				WHERE nectar_users.username = $1 
 				LIMIT 1)`
 	var isUsernameTaken bool
 	row := d.Client.QueryRowContext(ctx, query, username)
@@ -161,4 +122,37 @@ func (d *Database) CheckIfUsernameIsTaken(ctx context.Context, username string) 
 		return false, fmt.Errorf("row.Scan in %s failed for %v", tag, err)
 	}
 	return isUsernameTaken, nil
+}
+
+func (d *Database) GetUser(ctx context.Context, id string) (*user.User, error) {
+	tag := "db.user.GetUser"
+	query := `SELECT 
+    				nectar_users.id, 
+    				nectar_users.first_name as name, 
+    				nectar_users.email,
+    				nectar_users.username,
+    				nectar_users.profile_image
+				FROM nectar_users
+				WHERE nectar_users.id = $1`
+	var rows []UserRow
+	if err := d.Client.SelectContext(ctx, &rows, query, id); err != nil {
+		return nil, fmt.Errorf("sqlx.SelectContext in %s failed for %v", tag, err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no user with the given id: %s", id)
+	}
+	return convertUserRowToUser(rows[0]), nil
+}
+
+// DeleteUser - Update the deletion date to today
+func (d *Database) DeleteUser(ctx context.Context, id string) error {
+	tag := "db.user.DeleteUser"
+	query := `UPDATE nectar_users
+				SET account_deletion_date = current_timestamp
+				WHERE nectar_users.id = $1`
+	_, err := d.Client.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("ExecContext in %s failed for %v", tag, err)
+	}
+	return nil
 }
