@@ -30,3 +30,4 @@ develop.env
 prod.env
 serviceAccountKey.json
 Taskfile.yml
+decryptedServiceAccountKey.json

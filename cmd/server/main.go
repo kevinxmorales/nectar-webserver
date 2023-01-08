@@ -28,11 +28,11 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("FAILED to connect to the blob store %v", err)
 	}
+	log.Info("attempting to set up auth client")
 	authClient, err := auth.SetUpAuthClient()
 	if err != nil {
 		return fmt.Errorf("FAILED to setup the authentication client %v", err)
 	}
-
 	log.Info("ready to start up server")
 	plantService := plant.NewService(database, blobStoreSession)
 	userService := user.NewService(database, authClient)
