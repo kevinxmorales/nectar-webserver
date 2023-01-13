@@ -22,17 +22,17 @@ type UserService interface {
 	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
 }
 
-func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var userRequest user.NewUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	validate := validator.New()
 	if err := validate.Struct(userRequest); err != nil {
 		res := responseEntity{Message: "Invalid request, please include all required fields"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusBadRequest))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -43,15 +43,15 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, db.DuplicateKeyError) {
 			res := responseEntity{Message: fmt.Sprintf("This email is already registered: %s", userRequest.Email)}
-			log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusBadRequest))
+			log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 			w.WriteHeader(http.StatusBadRequest)
 			if err := json.NewEncoder(w).Encode(res); err != nil {
 				panic(err)
 			}
 			return
 		}
-		res := responseEntity{Message: fmt.Sprintf("This email is already registered: %s", userRequest.Email)}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		res := responseEntity{Message: fmt.Sprintf("An unexpected error occurred")}
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -67,12 +67,12 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
 		res := responseEntity{Message: "Invalid id, please provide a valid id"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusBadRequest))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", "Invalid id", http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -82,7 +82,7 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
 	usr, err := h.UserService.GetUser(r.Context(), id)
 	if err != nil {
 		res := responseEntity{Message: "Unexpected error, could not get user info"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -98,13 +98,13 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (h *Handler) getUserById(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetUserById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	usr, err := h.UserService.GetUserById(r.Context(), id)
 	if err != nil {
 		res := responseEntity{Message: "Unexpected error, could not get user info"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -120,19 +120,19 @@ func (h *Handler) getUserById(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (h *Handler) updateUserProfileImage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateUserProfileImage(w http.ResponseWriter, r *http.Request) {
 	//vars := mux.Vars(r)
 	//id := vars["id"]
 	return
 }
 
-func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	var usr user.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&usr); err != nil {
 		res := responseEntity{Message: "Unexpected error, could not get user info"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -142,7 +142,7 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 	usrUpdated, err := h.UserService.UpdateUser(r.Context(), id, usr)
 	if err != nil {
 		res := responseEntity{Message: "Unexpected error, could not get user info"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -163,7 +163,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 	if err := h.UserService.DeleteUser(r.Context(), id); err != nil {
 		res := responseEntity{Message: "Unexpected error, could not delete user info, please try again"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -179,7 +179,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (h *Handler) checkIfUsernameIsTaken(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CheckIfUsernameIsTaken(w http.ResponseWriter, r *http.Request) {
 	type response struct {
 		Username string `json:"username"`
 		IsTaken  bool   `json:"isTaken"`
@@ -188,7 +188,7 @@ func (h *Handler) checkIfUsernameIsTaken(w http.ResponseWriter, r *http.Request)
 	params, err := h.ParseUrlQueryParams(r.URL, usernameParam)
 	if err != nil {
 		res := responseEntity{Message: "Unexpected error"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d | error: %v", http.StatusInternalServerError, err))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)
@@ -199,7 +199,7 @@ func (h *Handler) checkIfUsernameIsTaken(w http.ResponseWriter, r *http.Request)
 	isTaken, err := h.UserService.CheckIfUsernameIsTaken(r.Context(), username)
 	if err != nil {
 		res := responseEntity{Message: "Unexpected error"}
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d | error: %v", http.StatusInternalServerError, err))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			panic(err)

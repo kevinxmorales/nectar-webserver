@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	firebaseAuth "firebase.google.com/go/v4/auth"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 )
@@ -14,10 +13,6 @@ type AuthService interface {
 
 func (h *Handler) JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if true {
-			original(w, r)
-			return
-		}
 		authHeader := r.Header["Authorization"]
 		if authHeader == nil {
 			http.Error(w, "not authorized", http.StatusUnauthorized)
@@ -34,12 +29,9 @@ func (h *Handler) JWTAuth(original func(w http.ResponseWriter, r *http.Request))
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
-		log.Info(token.UID)
-		original(w, r)
+		userId := token.Claims["user_id"]
+		newCtx := context.WithValue(r.Context(), "userId", userId)
+		reqWithContext := r.WithContext(newCtx)
+		original(w, reqWithContext)
 	}
-}
-
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-
-	return
 }

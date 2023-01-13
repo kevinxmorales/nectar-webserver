@@ -5,10 +5,9 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"encoding/base64"
 	firebase "firebase.google.com/go/v4"
-	firebaseAuth "firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/auth"
 	"fmt"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"google.golang.org/api/option"
@@ -16,30 +15,6 @@ import (
 	"io/ioutil"
 	"os"
 )
-
-func encrypt(keyString string, stringToEncrypt string) string {
-	plaintext := []byte(stringToEncrypt)
-
-	//Create a new Cipher Block from the key
-	block, err := aes.NewCipher([]byte(keyString))
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// The IV needs to be unique, but not secure. Therefore, it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		panic(err)
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext)
-}
 
 // decrypt from base64 to decrypted string
 func decrypt(keyString string, stringToDecrypt string) error {
@@ -74,7 +49,7 @@ func decrypt(keyString string, stringToDecrypt string) error {
 	return nil
 }
 
-func SetUpAuthClient() (*firebaseAuth.Client, error) {
+func SetUpAuthClient() (*auth.Client, error) {
 	secret := os.Getenv("ENCRYPT_SECRET")
 	plaintext, err := ioutil.ReadFile("encryptedServiceAccountKey.json")
 	if err != nil {
@@ -101,17 +76,17 @@ type Store interface {
 
 type Service struct {
 	Store      Store
-	AuthClient *firebaseAuth.Client
+	AuthClient *auth.Client
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store, authClient *firebaseAuth.Client) *Service {
+func NewService(store Store, authClient *auth.Client) *Service {
 	return &Service{
 		Store:      store,
 		AuthClient: authClient,
 	}
 }
 
-func (s *Service) VerifyIDToken(ctx context.Context, token string) (*firebaseAuth.Token, error) {
+func (s *Service) VerifyIDToken(ctx context.Context, token string) (*auth.Token, error) {
 	return s.AuthClient.VerifyIDToken(ctx, token)
 }

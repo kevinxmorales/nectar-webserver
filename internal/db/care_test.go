@@ -5,10 +5,10 @@ package db
 import (
 	"context"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
-	"math/rand"
 	"testing"
 )
 
@@ -19,19 +19,20 @@ func TestCareLogDatabase(t *testing.T) {
 		assert.NoError(t, err)
 
 		//First add a new plant to db
-		userId := 5
-		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:       "testPlant",
-			UserId:     userId,
-			FileNames:  []string{"file1.jpg"},
-			CategoryID: "21",
-		})
+		userId := uuid.NewV4().String()
+		ctx := context.WithValue(context.Background(), "userId", userId)
+		insertedPlant, err := db.AddPlant(ctx, plant.Plant{
+			CommonName:     "testPlant",
+			ScientificName: "scientificName",
+			Toxicity:       "not toxic",
+			UserId:         userId,
+		}, []string{"imageUrl1", "imageUrl2"})
 		assert.NoError(t, err)
 
 		//Log a plant care entry
 		notes := "I think I may have over-watered this plant today"
 		entry := care.LogEntry{
-			PlantId:       insertedPlant.Id,
+			PlantId:       insertedPlant.PlantId,
 			Notes:         notes,
 			WasFertilized: false,
 			WasWatered:    true,
@@ -39,7 +40,7 @@ func TestCareLogDatabase(t *testing.T) {
 		logEntry, err := db.AddCareLogEntry(context.Background(), entry)
 		assert.NoError(t, err)
 		assert.True(t, notes == logEntry.Notes)
-		assert.Equal(t, insertedPlant.Id, logEntry.PlantId)
+		assert.Equal(t, insertedPlant.PlantId, logEntry.PlantId)
 		assert.NotNil(t, logEntry.Date)
 		assert.True(t, logEntry.WasWatered)
 		assert.False(t, logEntry.WasFertilized)
@@ -51,23 +52,23 @@ func TestCareLogDatabase(t *testing.T) {
 
 		//First add a new plant to db
 		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:       "testPlant",
-			UserId:     rand.Intn(100),
-			FileNames:  []string{"file1.jpg"},
-			CategoryID: "21",
-		})
+			CommonName:     "testPlant",
+			ScientificName: "scientificName",
+			Toxicity:       "not toxic",
+			UserId:         uuid.NewV4().String(),
+		}, []string{})
 		assert.NoError(t, err)
 
 		//Log a plant care entry with no notes
 		entry := care.LogEntry{
-			PlantId:       insertedPlant.Id,
+			PlantId:       insertedPlant.PlantId,
 			WasFertilized: false,
 			WasWatered:    true,
 		}
 		logEntry, err := db.AddCareLogEntry(context.Background(), entry)
 		assert.NoError(t, err)
 		assert.Equal(t, "", logEntry.Notes)
-		db.DeletePlant(context.Background(), insertedPlant.Id)
+		db.DeletePlant(context.Background(), insertedPlant.PlantId)
 		db.DeleteCareLogEntry(context.Background(), logEntry.Id)
 	})
 
@@ -77,11 +78,11 @@ func TestCareLogDatabase(t *testing.T) {
 
 		//First add a new plant to db
 		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:       "testPlant",
-			UserId:     rand.Intn(100),
-			FileNames:  []string{"file1.jpg"},
-			CategoryID: "21",
-		})
+			CommonName:     "testPlant",
+			ScientificName: "scientificName",
+			Toxicity:       "not toxic",
+			UserId:         uuid.NewV4().String(),
+		}, []string{})
 		assert.NoError(t, err)
 
 		numEntries := 5
@@ -91,7 +92,7 @@ func TestCareLogDatabase(t *testing.T) {
 			notes := fmt.Sprintf("iteration: %d", i)
 			//Log a plant care entry with no notes
 			entry := care.LogEntry{
-				PlantId:       insertedPlant.Id,
+				PlantId:       insertedPlant.PlantId,
 				WasFertilized: false,
 				WasWatered:    true,
 				Notes:         notes,
@@ -101,7 +102,7 @@ func TestCareLogDatabase(t *testing.T) {
 			entries[i] = *logEntry
 		}
 		//Query for all those entries again
-		queriedEntries, err := db.GetCareLogsEntries(context.Background(), insertedPlant.Id)
+		queriedEntries, err := db.GetCareLogsEntries(context.Background(), insertedPlant.PlantId)
 		assert.NoError(t, err)
 		assert.Equal(t, numEntries, len(queriedEntries))
 
@@ -117,17 +118,17 @@ func TestCareLogDatabase(t *testing.T) {
 
 		//First add a new plant to db
 		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:       "testPlant",
-			UserId:     rand.Intn(100),
-			FileNames:  []string{"file1.jpg"},
-			CategoryID: "21",
-		})
+			CommonName:     "testPlant",
+			ScientificName: "scientificName",
+			Toxicity:       "not toxic",
+			UserId:         uuid.NewV4().String(),
+		}, []string{})
 		assert.NoError(t, err)
 
 		//Log a plant care entry
 		notes := "I think I may have over-watered this plant today"
 		entry := care.LogEntry{
-			PlantId:       insertedPlant.Id,
+			PlantId:       insertedPlant.PlantId,
 			Notes:         notes,
 			WasFertilized: false,
 			WasWatered:    true,
@@ -140,7 +141,7 @@ func TestCareLogDatabase(t *testing.T) {
 		assert.NoError(t, err)
 
 		//Try to query it again, this should be empty
-		entries, err := db.GetCareLogsEntries(context.Background(), insertedPlant.Id)
+		entries, err := db.GetCareLogsEntries(context.Background(), insertedPlant.PlantId)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(entries))
 	})
@@ -151,17 +152,17 @@ func TestCareLogDatabase(t *testing.T) {
 
 		//First add a new plant to db
 		insertedPlant, err := db.AddPlant(context.Background(), plant.Plant{
-			Name:       "testPlant",
-			UserId:     rand.Intn(100),
-			FileNames:  []string{"file1.jpg"},
-			CategoryID: "21",
-		})
+			CommonName:     "testPlant",
+			ScientificName: "scientificName",
+			Toxicity:       "not toxic",
+			UserId:         uuid.NewV4().String(),
+		}, []string{})
 		assert.NoError(t, err)
 
 		//Log a plant care entry
 		notes := "I think I may have over-watered this plant today"
 		entry := care.LogEntry{
-			PlantId:       insertedPlant.Id,
+			PlantId:       insertedPlant.PlantId,
 			Notes:         notes,
 			WasFertilized: false,
 			WasWatered:    true,
@@ -171,7 +172,7 @@ func TestCareLogDatabase(t *testing.T) {
 
 		newNote := "Nope this plant was not over-watered"
 		newLogEntry := care.LogEntry{
-			PlantId:       insertedPlant.Id,
+			PlantId:       insertedPlant.PlantId,
 			Notes:         newNote,
 			WasFertilized: true,
 			WasWatered:    false,

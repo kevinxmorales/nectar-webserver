@@ -14,10 +14,9 @@ func TestValidationService(t *testing.T) {
 		email := "kevin@email.com"
 
 		//Call validate email function
-		isValid := IsValidEmail(email)
-
+		err := IsValidEmail(email)
 		//Assert that this is a valid email
-		assert.True(t, isValid)
+		assert.NoError(t, err)
 	})
 
 	t.Run("test valid email function failure", func(t *testing.T) {
@@ -25,9 +24,9 @@ func TestValidationService(t *testing.T) {
 		email := "kevin@email@yahoo.com.edu"
 
 		//Call validate email function
-		isValid := IsValidEmail(email)
+		err := IsValidEmail(email)
 
 		//Assert that this is not a valid email
-		assert.False(t, isValid)
+		assert.Error(t, err)
 	})
 }

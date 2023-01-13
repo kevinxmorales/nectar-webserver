@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"testing"
@@ -14,16 +15,17 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
+		firstName, email, username := "Kevin", "kevin@email.com", "kevin"
 		insertedUser, err := db.AddUser(context.Background(), user.User{
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
-			Password:  password,
+			Id:       uuid.NewV4().String(),
+			Name:     firstName,
+			Email:    email,
+			Username: username,
 		})
 		assert.NoError(t, err)
 		newUser, err := db.GetUser(context.Background(), insertedUser.Id)
-		assert.Equal(t, firstName, newUser.FirstName)
+		assert.NoError(t, err)
+		assert.Equal(t, firstName, newUser.Name)
 		err = db.DeleteUser(context.Background(), newUser.Id)
 		assert.NoError(t, err)
 	})
@@ -31,12 +33,12 @@ func TestUserDatabase(t *testing.T) {
 	t.Run("test delete user", func(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
-		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
+		firstName, username, email := "Kevin", "kevin_m", "kevin@email.com"
 		newUser, err := db.AddUser(context.Background(), user.User{
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
-			Password:  password,
+			Id:       uuid.NewV4().String(),
+			Name:     firstName,
+			Email:    email,
+			Username: username,
 		})
 		assert.NoError(t, err)
 
@@ -51,20 +53,19 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, lastName, email, password := "Kevin", "Morales", "kevin@email.com", "my_password"
+		firstName, username, email := "Kevin", "kevin_m", "kevin@email.com"
 		newUser, err := db.AddUser(context.Background(), user.User{
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
-			Password:  password,
+			Name:     firstName,
+			Email:    email,
+			Username: username,
+			Id:       uuid.NewV4().String(),
 		})
 		assert.NoError(t, err)
 		newEmail := "kevin@protonmail.com"
 		updatedUser, err := db.UpdateUser(context.Background(), newUser.Id, user.User{
-			FirstName: newUser.FirstName,
-			LastName:  newUser.LastName,
-			Email:     newEmail,
-			Password:  newUser.Password,
+			Name:     newUser.Name,
+			Email:    newEmail,
+			Username: newUser.Username,
 		})
 		assert.NoError(t, err)
 
@@ -77,7 +78,7 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		idNotInDB := 99999
+		idNotInDB := uuid.NewV4().String()
 		_, err = db.GetUser(context.Background(), idNotInDB)
 		assert.Error(t, err)
 
@@ -87,12 +88,11 @@ func TestUserDatabase(t *testing.T) {
 		db, err := NewDatabase()
 		assert.NoError(t, err)
 
-		firstName, lastName, email, password := "Kevin", "Morales", "kevin1234@email.com", "my_password"
+		firstName, username, email := "Kevin", "kevin_m", "kevin1234@email.com"
 		insertedUser, err := db.AddUser(context.Background(), user.User{
-			FirstName: firstName,
-			LastName:  lastName,
-			Email:     email,
-			Password:  password,
+			Name:     firstName,
+			Email:    email,
+			Username: username,
 		})
 		assert.NoError(t, err)
 

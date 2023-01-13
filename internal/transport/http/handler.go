@@ -70,25 +70,23 @@ func NewHandler(
 
 func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/alive", h.healthCheck).Methods(http.MethodGet)
-	// Auth Endpoints
-	h.Router.HandleFunc("/api/v1/auth", h.Login).Methods(http.MethodPost)
 	// Plant Endpoints
-	h.Router.HandleFunc("/api/v1/plant", h.JWTAuth(h.addPlant)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant", h.JWTAuth(h.AddPlant)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.GetPlant)).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.GetPlantsByUserId).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.JWTAuth(h.GetPlantsByUserId)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
 	// User Endpoints
-	h.Router.HandleFunc("/api/v1/user", h.createUser).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/user/{id}", h.getUser).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/user/id/{id}", h.getUserById).Methods(http.MethodGet)
-	h.Router.HandleFunc("/api/v1/user/id/{id}", h.updateUser).Methods(http.MethodPut)
+	h.Router.HandleFunc("/api/v1/user", h.CreateUser).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/user/{id}", h.JWTAuth(h.GetUser)).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.GetUserById)).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.UpdateUser)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.deleteUser)).Methods(http.MethodDelete)
-	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.checkIfUsernameIsTaken).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.CheckIfUsernameIsTaken).Methods(http.MethodGet)
 
 	//Plant Care Log Endpoints
 	h.Router.HandleFunc("/api/v1/plant-care", h.JWTAuth(h.AddCareLogEntry)).Methods(http.MethodPost)
-	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.GetCareLogsEntries).Methods(http.MethodGet)
+	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.GetCareLogsEntries)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.UpdateCareLogEntry)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.DeleteCareLogEntry)).Methods(http.MethodDelete)
 }

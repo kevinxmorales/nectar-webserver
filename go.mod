@@ -5,6 +5,7 @@ go 1.18
 require (
 	firebase.google.com/go/v4 v4.10.0
 	github.com/aws/aws-sdk-go v1.17.7
+	github.com/davecgh/go-spew v1.1.1
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
@@ -28,7 +29,6 @@ require (
 	cloud.google.com/go/longrunning v0.3.0 // indirect
 	cloud.google.com/go/storage v1.27.0 // indirect
 	github.com/MicahParks/keyfunc v1.5.1 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect

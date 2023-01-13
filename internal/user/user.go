@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	firebaseAuth "firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/auth"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/validation"
@@ -42,13 +42,17 @@ type Store interface {
 	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
 }
 
+type AuthClient interface {
+	CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error)
+}
+
 type Service struct {
 	Store      Store
-	AuthClient *firebaseAuth.Client
+	AuthClient AuthClient
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store, authClient *firebaseAuth.Client) *Service {
+func NewService(store Store, authClient AuthClient) *Service {
 	return &Service{
 		Store:      store,
 		AuthClient: authClient,
@@ -74,18 +78,18 @@ func (s *Service) AddUser(ctx context.Context, u NewUserRequest) (*User, error) 
 	if err := validation.IsValidEmail(u.Email); err != nil {
 		return nil, fmt.Errorf("email validation for email %s in %s, failed for %v", u.Email, tag, err)
 	}
-	params := (&firebaseAuth.UserToCreate{}).
-		UID(uuid.NewV4().String()).
+	newUserId := uuid.NewV4().String()
+	params := (&auth.UserToCreate{}).
+		UID(newUserId).
 		Email(u.Email).
 		EmailVerified(false).
 		Password(u.Password).
 		Disabled(false)
-	firebaseUser, err := s.AuthClient.CreateUser(ctx, params)
-	if err != nil {
+	if _, err := s.AuthClient.CreateUser(ctx, params); err != nil {
 		return nil, err
 	}
 	newUser := User{
-		Id:       firebaseUser.UID,
+		Id:       newUserId,
 		Name:     u.Name,
 		Email:    u.Email,
 		Username: strings.Split(u.Email, "@")[0],

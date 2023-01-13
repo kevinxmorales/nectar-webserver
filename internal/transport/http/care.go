@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
@@ -38,9 +39,15 @@ func convertRequestToLogEntry(request CareLogEntryRequest) care.LogEntry {
 func (h *Handler) GetCareLogsEntries(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, responseEntity{Message: "Invalid request, please include care log id"})
+		return
+	}
 	entries, err := h.CareService.GetCareLogsEntries(r.Context(), id)
 	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
@@ -54,7 +61,7 @@ func (h *Handler) GetCareLogsEntries(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AddCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	var logEntryRequest CareLogEntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&logEntryRequest); err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
@@ -63,7 +70,7 @@ func (h *Handler) AddCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	logEntry := convertRequestToLogEntry(logEntryRequest)
 	insertedEntry, err := h.CareService.AddCareLogEntry(r.Context(), logEntry)
 	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
@@ -77,16 +84,22 @@ func (h *Handler) AddCareLogEntry(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, responseEntity{Message: "Invalid request, please include care log id"})
+		return
+	}
 	var logEntryRequest CareLogEntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&logEntryRequest); err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
 	}
 	validate := validator.New()
 	if err := validate.Struct(logEntryRequest); err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusBadRequest))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
@@ -94,7 +107,7 @@ func (h *Handler) UpdateCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	entry := convertRequestToLogEntry(logEntryRequest)
 	updatedEntry, err := h.CareService.UpdateCareLogEntry(r.Context(), id, entry)
 	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
@@ -108,21 +121,20 @@ func (h *Handler) UpdateCareLogEntry(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == "" {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusBadRequest))
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		h.encodeJsonResponse(&w, responseEntity{Message: "Invalid request, please include care log id"})
 		return
 	}
-	err := h.CareService.DeleteCareLogEntry(r.Context(), id)
-	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, status code: %d", http.StatusInternalServerError))
+	if err := h.CareService.DeleteCareLogEntry(r.Context(), id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
 	w.WriteHeader(http.StatusOK)
-	h.encodeJsonResponse(&w, responseEntity{Message: "entry successfully deleted"})
+	h.encodeJsonResponse(&w, responseEntity{Content: "entry successfully deleted"})
 	return
 }

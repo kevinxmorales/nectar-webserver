@@ -66,7 +66,7 @@ func (d *Database) GetCareLogsEntries(ctx context.Context, plantId string) ([]ca
     			created_at
 				FROM care_log
 				WHERE plant_id = $1
-				ORDER BY created_at`
+				ORDER BY created_at DESC`
 	rows, err := d.Client.QueryContext(ctx, query, plantId)
 	if err != nil {
 		return nil, fmt.Errorf("QueryContext in db.care.GetCareLogsEntries for %v", err)

@@ -5,19 +5,20 @@ import (
 	"database/sql"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	errs "gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/plant"
 	"time"
 )
 
-type plantRow struct {
+type PlantRow struct {
 	PlantId          string         `db:"id"`
 	UserId           string         `db:"user_id"`
 	Username         string         `db:"user_name"`
 	CommonName       string         `db:"common_name"`
 	ScientificName   sql.NullString `db:"scientific_name"`
 	Toxicity         sql.NullString `db:"toxicity"`
-	CreatedAt        time.Time      `db:"createdAt"`
+	CreatedAt        time.Time      `db:"created_at"`
 	UserProfileImage sql.NullString `db:"profile_image"`
 }
 
@@ -26,7 +27,7 @@ type imagesRow struct {
 	PlantId string `db:"plant_id" sql:"type:uuid"`
 }
 
-func convertPlantRowToPlant(p plantRow) *plant.Plant {
+func convertPlantRowToPlant(p PlantRow) *plant.Plant {
 	return &plant.Plant{
 		PlantId:          p.PlantId,
 		UserId:           p.UserId,
@@ -41,7 +42,7 @@ func convertPlantRowToPlant(p plantRow) *plant.Plant {
 
 func (d *Database) GetPlant(ctx context.Context, id string) (*plant.Plant, error) {
 	tag := "db.plant.GetPlant"
-	var pr plantRow
+	var pr PlantRow
 	query := `SELECT 
     				plant.id, 
     				plant.user_id, 
@@ -53,7 +54,8 @@ func (d *Database) GetPlant(ctx context.Context, id string) (*plant.Plant, error
     				nectar_users.profile_image
 				FROM plant
 				JOIN nectar_users ON plant.user_id = nectar_users.id
-				WHERE plant.id = $1`
+				WHERE 1=1
+				AND plant.id = $1`
 	row := d.Client.QueryRowContext(ctx, query, id)
 	err := row.Scan(&pr.PlantId, &pr.UserId, &pr.CommonName, &pr.ScientificName, &pr.Toxicity, &pr.CreatedAt, &pr.Username, &pr.UserProfileImage)
 	if err != nil {
@@ -92,9 +94,9 @@ func (d *Database) GetPlantsByUserId(ctx context.Context, id string) ([]plant.Pl
 		return nil, fmt.Errorf("sqlx.QueryContext in %s failed for %s", tag, err.Error())
 	}
 	defer closeDbRows(rows, query)
-	var plantList []plant.Plant
+	plantList := []plant.Plant{}
 	for rows.Next() {
-		pr := plantRow{}
+		pr := PlantRow{}
 		err := rows.Scan(&pr.PlantId, &pr.UserId, &pr.CommonName, &pr.ScientificName, &pr.Toxicity, &pr.CreatedAt, &pr.Username, &pr.UserProfileImage)
 		if err != nil {
 			return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
@@ -147,10 +149,15 @@ func (d *Database) AddPlant(ctx context.Context, p plant.Plant, images []string)
 		return nil, fmt.Errorf("sqlx.Begin in %s failed for %v", tag, err)
 	}
 	id := uuid.NewV4().String()
-	tx.MustExecContext(ctx, queryToInsertPlant, id, p.CommonName, p.ScientificName, p.UserId, p.Toxicity)
+	_, err = tx.ExecContext(ctx, queryToInsertPlant, id, p.CommonName, p.ScientificName, p.UserId, p.Toxicity)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("sqlx.tx.ExecContext in %s failed for %v", tag, err)
+	}
 	insertImagesQuery := "INSERT INTO plant_images (image, plant_id) VALUES (:image, :plant_id)"
 	for i, _ := range images {
-		if _, err := tx.NamedExecContext(ctx, insertImagesQuery, []imagesRow{{Image: p.Images[i], PlantId: id}}); err != nil {
+		if _, err := tx.NamedExecContext(ctx, insertImagesQuery, []imagesRow{{Image: images[i], PlantId: id}}); err != nil {
+			log.Error(err)
 			tx.Rollback()
 			return nil, fmt.Errorf("sqlx.tx.NamedExecContext in %s failed for %v", tag, err)
 		}
@@ -168,8 +175,10 @@ func (d *Database) DeletePlant(ctx context.Context, id string) error {
 	tag := "db.plant.DeletePlant"
 	query := `UPDATE plant
 				SET deletion_date = current_timestamp
-				WHERE plant.id = $1`
-	if _, err := d.Client.ExecContext(ctx, query, id); err != nil {
+				WHERE 1=1
+				AND plant.id = $1
+				AND plant.user_id = $2`
+	if _, err := d.Client.ExecContext(ctx, query, id, ctx.Value("userId")); err != nil {
 		return fmt.Errorf("sqlx.ExecContext in %s failed for %v", tag, err)
 	}
 	return nil
@@ -180,13 +189,15 @@ func (d *Database) UpdatePlant(ctx context.Context, id string, p plant.Plant) (*
 	query := `UPDATE plant SET
 				common_name = $1,
             	scientific_name = $2,
-            	toxicity = $3,
-			WHERE plant.id = $4`
+            	toxicity = $3
+				WHERE 1=1
+				AND plant.id = $4
+				AND plant.user_id = $5`
 	tx, err := d.Client.Beginx()
 	if err != nil {
 		return nil, fmt.Errorf("sqlx.Begin in %s failed for %v", tag, err)
 	}
-	tx.MustExecContext(ctx, query, p.CommonName, p.ScientificName, p.Toxicity, p.PlantId)
+	tx.MustExecContext(ctx, query, p.CommonName, p.ScientificName, p.Toxicity, p.PlantId, ctx.Value("userId"))
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("sqlx.tx.Commit in %s failed for %v", tag, err)

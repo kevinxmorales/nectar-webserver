@@ -5,15 +5,28 @@ package user
 import (
 	"context"
 	"errors"
+	"firebase.google.com/go/v4/auth"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
-	"math/rand"
 	"testing"
 )
 
 var contextFailureKey = "shouldFail"
 
 type StoreImpl struct {
-	mapDB map[int]User
+	mapDB map[string]User
+}
+
+func (s *StoreImpl) GetUserById(ctx context.Context, id string) (*User, error) {
+	user, ok := s.mapDB[id]
+	if !ok {
+		return nil, errors.New("unable to get user from db")
+	}
+	return &user, nil
+}
+
+func (s *StoreImpl) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {
+	panic("implement me")
 }
 
 func (s *StoreImpl) AddUser(ctx context.Context, u User) (*User, error) {
@@ -21,12 +34,12 @@ func (s *StoreImpl) AddUser(ctx context.Context, u User) (*User, error) {
 	if shouldFail == "true" {
 		return nil, errors.New("could not add user to db")
 	}
-	u.Id = rand.Intn(1000)
+	u.Id = uuid.NewV4().String()
 	s.mapDB[u.Id] = u
 	return &u, nil
 }
 
-func (s *StoreImpl) GetUser(ctx context.Context, id int) (*User, error) {
+func (s *StoreImpl) GetUser(ctx context.Context, id string) (*User, error) {
 	user, ok := s.mapDB[id]
 	if !ok {
 		return nil, errors.New("unable to get user from db")
@@ -43,7 +56,7 @@ func (s *StoreImpl) GetUserByEmail(ctx context.Context, email string) (*User, er
 	return nil, errors.New("could not find user in db")
 }
 
-func (s *StoreImpl) DeleteUser(ctx context.Context, id int) error {
+func (s *StoreImpl) DeleteUser(ctx context.Context, id string) error {
 	_, ok := s.mapDB[id]
 	if !ok {
 		return errors.New("unable to delete user")
@@ -52,7 +65,7 @@ func (s *StoreImpl) DeleteUser(ctx context.Context, id int) error {
 	return nil
 }
 
-func (s StoreImpl) UpdateUser(ctx context.Context, id int, u User) (*User, error) {
+func (s StoreImpl) UpdateUser(ctx context.Context, id string, u User) (*User, error) {
 	_, present := s.mapDB[id]
 	if present {
 		return nil, errors.New("cannot add user to db, duplicate ids")
@@ -61,21 +74,29 @@ func (s StoreImpl) UpdateUser(ctx context.Context, id int, u User) (*User, error
 	return &u, nil
 }
 
-var testUser = User{
-	FirstName: "Kevin",
-	LastName:  "Morales",
-	Email:     "kevin@testEmail.com",
-	Password:  "myPassword",
+type AuthImpl struct{}
+
+func (a *AuthImpl) CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error) {
+	return nil, nil
+}
+
+var testUser = NewUserRequest{
+	Name:     "Kevin",
+	Username: "kevin_m",
+	Email:    "kevin@testEmail.com",
+	Password: "password",
 }
 
 func TestUserService(t *testing.T) {
 
 	//Get the mocked data store struct
 	store := StoreImpl{
-		mapDB: make(map[int]User),
+		mapDB: make(map[string]User),
 	}
+	authClient := AuthImpl{}
+
 	//Initialize a User Service struct with the mock data store
-	service := NewService(&store)
+	service := NewService(&store, &authClient)
 
 	t.Run("test create user", func(t *testing.T) {
 		//Db process should succeed
@@ -109,7 +130,7 @@ func TestUserService(t *testing.T) {
 
 	t.Run("test fail to delete user, not in db", func(t *testing.T) {
 		//Now try to delete, should fail
-		err := service.DeleteUser(context.Background(), 9999)
+		err := service.DeleteUser(context.Background(), uuid.NewV4().String())
 		assert.Error(t, err)
 	})
 
