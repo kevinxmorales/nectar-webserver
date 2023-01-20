@@ -1,0 +1,2 @@
+ALTER TABLE care_log
+ADD COLUMN care_date date NOT NULL DEFAULT CURRENT_DATE;

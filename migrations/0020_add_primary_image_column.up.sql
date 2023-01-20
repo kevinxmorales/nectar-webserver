@@ -1,0 +1,1 @@
+ALTER TABLE plant_images ADD COLUMN is_primary_image bool NOT NULL DEFAULT false;
