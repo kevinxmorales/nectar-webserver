@@ -23,8 +23,9 @@ type PlantRow struct {
 }
 
 type imagesRow struct {
-	Image   string `db:"image" sql:"type:text"`
-	PlantId string `db:"plant_id" sql:"type:uuid"`
+	Image          string `db:"image" sql:"type:text"`
+	PlantId        string `db:"plant_id" sql:"type:uuid"`
+	IsPrimaryImage bool   `db:"is_primary_image" sql:"type:bool"`
 }
 
 func convertPlantRowToPlant(p PlantRow) *plant.Plant {
@@ -154,9 +155,10 @@ func (d *Database) AddPlant(ctx context.Context, p plant.Plant, images []string)
 		tx.Rollback()
 		return nil, fmt.Errorf("sqlx.tx.ExecContext in %s failed for %v", tag, err)
 	}
-	insertImagesQuery := "INSERT INTO plant_images (image, plant_id) VALUES (:image, :plant_id)"
+	insertImagesQuery := "INSERT INTO plant_images (image, plant_id, is_primary_image) VALUES (:image, :plant_id, :is_primary_image)"
 	for i, _ := range images {
-		if _, err := tx.NamedExecContext(ctx, insertImagesQuery, []imagesRow{{Image: images[i], PlantId: id}}); err != nil {
+		isPrimaryImage := i == 0
+		if _, err := tx.NamedExecContext(ctx, insertImagesQuery, []imagesRow{{Image: images[i], PlantId: id, IsPrimaryImage: isPrimaryImage}}); err != nil {
 			log.Error(err)
 			tx.Rollback()
 			return nil, fmt.Errorf("sqlx.tx.NamedExecContext in %s failed for %v", tag, err)

@@ -41,7 +41,7 @@ func TestCareLogDatabase(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, notes == logEntry.Notes)
 		assert.Equal(t, insertedPlant.PlantId, logEntry.PlantId)
-		assert.NotNil(t, logEntry.Date)
+		assert.NotNil(t, logEntry.CreatedAt)
 		assert.True(t, logEntry.WasWatered)
 		assert.False(t, logEntry.WasFertilized)
 	})

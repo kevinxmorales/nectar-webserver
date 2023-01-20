@@ -89,6 +89,8 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.GetCareLogsEntries)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.UpdateCareLogEntry)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.DeleteCareLogEntry)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/plant-care/user/{id}", h.JWTAuth(h.GetAllUsersCareLogs)).Methods(http.MethodGet)
+
 }
 
 func (h *Handler) Serve() error {

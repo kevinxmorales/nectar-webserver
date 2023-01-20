@@ -2,36 +2,40 @@ package care
 
 import (
 	"context"
-	"time"
 )
 
 type LogEntry struct {
-	Id            string    `json:"id"`
-	Date          time.Time `json:"date"`
-	PlantId       string    `json:"plantId"`
-	Notes         string    `json:"notes"`
-	WasWatered    bool      `json:"wasWatered"`
-	WasFertilized bool      `json:"wasFertilized"`
+	Id            string `json:"id"`
+	PlantId       string `json:"plantId"`
+	Notes         string `json:"notes"`
+	CareDate      string `json:"careDate"`
+	CreatedAt     string `json:"createdAt"`
+	PlantImage    string `json:"plantImage"`
+	PlantName     string `json:"plantName"`
+	WasWatered    bool   `json:"wasWatered"`
+	WasFertilized bool   `json:"wasFertilized"`
 }
 
 type Store interface {
+	GetAllUsersCareLogEntries(ctx context.Context, userId string) ([]LogEntry, error)
 	GetCareLogsEntries(ctx context.Context, plantId string) ([]LogEntry, error)
 	AddCareLogEntry(ctx context.Context, entry LogEntry) (*LogEntry, error)
 	DeleteCareLogEntry(ctx context.Context, logEntryId string) error
 	UpdateCareLogEntry(ctx context.Context, logEntryId string, entry LogEntry) (*LogEntry, error)
 }
 
-// Service - is the struct on which our logic will
-// be built upon
 type Service struct {
 	Store Store
 }
 
-// NewService - returns a pointer to a new service
 func NewService(store Store) *Service {
 	return &Service{
 		Store: store,
 	}
+}
+
+func (s *Service) GetAllUsersCareLogs(ctx context.Context, userId string) ([]LogEntry, error) {
+	return s.Store.GetAllUsersCareLogEntries(ctx, userId)
 }
 
 func (s *Service) GetCareLogsEntries(ctx context.Context, plantId string) ([]LogEntry, error) {
