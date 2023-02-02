@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"image"
 	"io"
@@ -20,7 +21,7 @@ import (
 	"time"
 )
 
-type responseEntity struct {
+type Response struct {
 	Content any    `json:"content"`
 	Message string `json:"message"`
 }
@@ -81,7 +82,8 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/api/v1/user/{id}", h.JWTAuth(h.GetUser)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.GetUserById)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.UpdateUser)).Methods(http.MethodPut)
-	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.deleteUser)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/user/id/{id}/image", h.JWTAuth(h.UpdateUserProfileImage)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.DeleteUser)).Methods(http.MethodDelete)
 	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.CheckIfUsernameIsTaken).Methods(http.MethodGet)
 
 	//Plant Care Log Endpoints
@@ -144,20 +146,20 @@ func (h *Handler) ParseFilesFromMultiPartFormData(formData *multipart.Form, numb
 				return errors.New(fmt.Sprintf("unable to parse file supplied: %s", fileName))
 			}
 			file, err := files[0].Open()
-			defer file.Close()
 			if err != nil {
 				return err
 			}
+			defer file.Close()
 			year, month, day := time.Now().Date()
 			hour := time.Now().Hour()
 			minute := time.Now().Minute()
 			newFileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s", year, month, day, hour, minute, files[0].Filename)
 			fmt.Println(newFileName)
 			out, err := os.Create(newFileName)
-			defer out.Close()
 			if err != nil {
 				return errors.New("unable to create the file for writing")
 			}
+			defer out.Close()
 			// file not files[i] !
 			if _, err := io.Copy(out, file); err != nil {
 				return err
@@ -213,7 +215,35 @@ func (h *Handler) ParseImagesFromRequestBody(request *http.Request, numImages in
 	return images, nil
 }
 
-func (h *Handler) encodeJsonResponse(w *http.ResponseWriter, res responseEntity) {
+func ParseImageFromRequestBody(r *http.Request) (string, error) {
+	// parse the multipart form in the request
+	if err := r.ParseMultipartForm(1024); err != nil {
+		return "", err
+	}
+
+	// get the file from the form
+	file, _, err := r.FormFile("image")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// read the file into a buffer
+	var buf bytes.Buffer
+	io.Copy(&buf, file)
+
+	year, month, day := time.Now().Date()
+	hour := time.Now().Hour()
+	minute := time.Now().Minute()
+	// write the buffer to a file
+	fileName := fmt.Sprintf("/tmp/%d-%d-%d-T-%d-%d-%s.jpeg", year, month, day, hour, minute, uuid.NewV4().String())
+	if err = ioutil.WriteFile(fileName, buf.Bytes(), 0644); err != nil {
+		return "", err
+	}
+	return fileName, nil
+}
+
+func (h *Handler) encodeJsonResponse(w *http.ResponseWriter, res Response) {
 	if err := json.NewEncoder(*w).Encode(res); err != nil {
 		panic(err)
 	}
