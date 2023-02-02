@@ -3,12 +3,12 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/db"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"net/http"
 )
@@ -19,6 +19,7 @@ type UserService interface {
 	AddUser(ctx context.Context, u user.NewUserRequest) (*user.User, error)
 	DeleteUser(ctx context.Context, id string) error
 	UpdateUser(ctx context.Context, id string, u user.UpdateUserRequest) (*user.User, error)
+	UpdateUserProfileImage(ctx context.Context, filePath string, id string) (string, error)
 	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
 }
 
@@ -31,138 +32,155 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	validate := validator.New()
 	if err := validate.Struct(userRequest); err != nil {
-		res := responseEntity{Message: "Invalid request, please include all required fields"}
+		res := Response{Message: "Invalid request, please include all required fields"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	insertedUser, err := h.UserService.AddUser(r.Context(), userRequest)
 	if err != nil {
-		if errors.Is(err, db.DuplicateKeyError) {
-			res := responseEntity{Message: fmt.Sprintf("This email is already registered: %s", userRequest.Email)}
+		switch err {
+		case nectar_errors.BadRequestError{}:
+			res := Response{Message: fmt.Sprintf("Provided email or username is already registered: %s", userRequest.Email)}
 			log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 			w.WriteHeader(http.StatusBadRequest)
-			if err := json.NewEncoder(w).Encode(res); err != nil {
-				panic(err)
-			}
+			h.encodeJsonResponse(&w, res)
+			return
+		default:
+			res := Response{Message: fmt.Sprintf("An unexpected error occurred")}
+			log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+			w.WriteHeader(http.StatusInternalServerError)
+			h.encodeJsonResponse(&w, res)
 			return
 		}
-		res := responseEntity{Message: fmt.Sprintf("An unexpected error occurred")}
-		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
-		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
-		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	res := responseEntity{Content: insertedUser, Message: "account successfully created"}
+	res := Response{Content: insertedUser, Message: "account successfully created"}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		panic(err)
-	}
+	h.encodeJsonResponse(&w, res)
 	return
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	if id == "" {
-		res := responseEntity{Message: "Invalid id, please provide a valid id"}
-		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", "Invalid id", http.StatusBadRequest))
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s, status code: %d", "invalid id", http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, Response{Message: fmt.Sprintf("invalid id %s", id)})
 		return
 	}
 	usr, err := h.UserService.GetUser(r.Context(), id)
 	if err != nil {
-		res := responseEntity{Message: "Unexpected error, could not get user info"}
+		res := Response{Message: "Unexpected error, could not get user info"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	res := responseEntity{Content: usr, Message: "account successfully created"}
+	res := Response{Content: usr, Message: "account successfully created"}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		panic(err)
-	}
+	h.encodeJsonResponse(&w, res)
 	return
 }
 
 func (h *Handler) GetUserById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s, status code: %d", "invalid id", http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, Response{Message: fmt.Sprintf("invalid id %s", id)})
+		return
+	}
 	usr, err := h.UserService.GetUserById(r.Context(), id)
 	if err != nil {
-		res := responseEntity{Message: "Unexpected error, could not get user info"}
+		res := Response{Message: "Unexpected error, could not get user info"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	res := responseEntity{Content: usr, Message: "account successfully created"}
+	res := Response{Content: usr, Message: "account successfully created"}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		panic(err)
-	}
+	h.encodeJsonResponse(&w, res)
 	return
 }
 
 func (h *Handler) UpdateUserProfileImage(w http.ResponseWriter, r *http.Request) {
-	//vars := mux.Vars(r)
-	//id := vars["id"]
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s, status code: %d", "invalid id", http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, Response{Message: fmt.Sprintf("invalid id %s", id)})
+		return
+	}
+	filePath, err := ParseImageFromRequestBody(r)
+	if err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		w.WriteHeader(http.StatusInternalServerError)
+		h.encodeJsonResponse(&w, Response{Message: "Unexpected error, could not update user profile image"})
+		return
+	}
+	fileUri, err := h.UserService.UpdateUserProfileImage(r.Context(), filePath, id)
+	if err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		w.WriteHeader(http.StatusInternalServerError)
+		h.encodeJsonResponse(&w, Response{Message: "Unexpected error, could not update user profile image"})
+		return
+	}
+	content := struct {
+		uri string
+	}{uri: fileUri}
+	h.encodeJsonResponse(&w, Response{Content: content})
 	return
 }
 
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s, status code: %d", "invalid id", http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, Response{Message: fmt.Sprintf("invalid id %s", id)})
+		return
+	}
 	var usr user.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&usr); err != nil {
-		res := responseEntity{Message: "Unexpected error, could not get user info"}
+		res := Response{Message: "Unexpected error, could not get user info"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	usrUpdated, err := h.UserService.UpdateUser(r.Context(), id, usr)
 	if err != nil {
-		res := responseEntity{Message: "Unexpected error, could not get user info"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, Response{Message: "Unexpected error, could not get user info"})
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	res := responseEntity{Content: usrUpdated, Message: "user data successfully updated"}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		panic(err)
-	}
+	h.encodeJsonResponse(&w, Response{Content: usrUpdated, Message: "user data successfully updated"})
 	return
 }
 
-func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	if _, err := uuid.Parse(id); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s, status code: %d", "invalid id", http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, Response{Message: fmt.Sprintf("invalid id %s", id)})
+		return
+	}
 	if err := h.UserService.DeleteUser(r.Context(), id); err != nil {
-		res := responseEntity{Message: "Unexpected error, could not delete user info, please try again"}
+		res := Response{Message: "Unexpected error, could not delete user info, please try again"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -187,23 +205,19 @@ func (h *Handler) CheckIfUsernameIsTaken(w http.ResponseWriter, r *http.Request)
 	usernameParam := "username"
 	params, err := h.ParseUrlQueryParams(r.URL, usernameParam)
 	if err != nil {
-		res := responseEntity{Message: "Unexpected error"}
+		res := Response{Message: "Unexpected error"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	username := params[usernameParam]
 	isTaken, err := h.UserService.CheckIfUsernameIsTaken(r.Context(), username)
 	if err != nil {
-		res := responseEntity{Message: "Unexpected error"}
+		res := Response{Message: "Unexpected error"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			panic(err)
-		}
+		h.encodeJsonResponse(&w, res)
 		return
 	}
 	res := response{
@@ -212,8 +226,5 @@ func (h *Handler) CheckIfUsernameIsTaken(w http.ResponseWriter, r *http.Request)
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(responseEntity{Content: res}); err != nil {
-		panic(err)
-	}
-	return
+	h.encodeJsonResponse(&w, Response{Content: res})
 }

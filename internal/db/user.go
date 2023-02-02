@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/omeid/pgerror"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
-	"strings"
 )
 
 type UserRow struct {
@@ -69,8 +70,8 @@ func (d *Database) AddUser(ctx context.Context, u user.User) (*user.User, error)
 	}
 	rows, err := d.Client.NamedQueryContext(ctx, query, userRow)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil, DuplicateKeyError
+		if e := pgerror.UniqueViolation(err); e != nil {
+			return nil, nectar_errors.DuplicateKeyError{}
 		}
 		return nil, fmt.Errorf("NamedQueryContext in %s failed for %v", tag, err)
 	}
@@ -106,6 +107,18 @@ func (d *Database) UpdateUser(ctx context.Context, id string, u user.User) (*use
 		return nil, fmt.Errorf("rows.Scan in %s failed for %v", tag, err)
 	}
 	return convertUserRowToUser(ur), nil
+}
+
+func (d *Database) UpdateUserProfileImage(ctx context.Context, uri string, id string) (string, error) {
+	tag := "db.UpdateUserProfileImage"
+	query := `UPDATE nectar_users
+				SET profile_image = $1
+				WHERE nectar_users.id = $2`
+	_, err := d.Client.QueryContext(ctx, query, uri, id)
+	if err != nil {
+		return "", fmt.Errorf("sqlx.QueryContext in %s failed for %v", tag, err)
+	}
+	return uri, nil
 }
 
 func (d *Database) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {

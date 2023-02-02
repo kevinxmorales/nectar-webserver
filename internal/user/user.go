@@ -2,11 +2,14 @@ package user
 
 import (
 	"context"
+	"errors"
 	"firebase.google.com/go/v4/auth"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
 	uuid "github.com/satori/go.uuid"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/validation"
-	"strings"
 )
 
 type NewUserRequest struct {
@@ -39,6 +42,7 @@ type Store interface {
 	AddUser(ctx context.Context, u User) (*User, error)
 	DeleteUser(ctx context.Context, id string) error
 	UpdateUser(ctx context.Context, id string, u User) (*User, error)
+	UpdateUserProfileImage(ctx context.Context, uri string, id string) (string, error)
 	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
 }
 
@@ -49,13 +53,15 @@ type AuthClient interface {
 type Service struct {
 	Store      Store
 	AuthClient AuthClient
+	BlobStore  *session.Session
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store, authClient AuthClient) *Service {
+func NewService(store Store, authClient AuthClient, blobStore *session.Session) *Service {
 	return &Service{
 		Store:      store,
 		AuthClient: authClient,
+		BlobStore:  blobStore,
 	}
 }
 
@@ -92,9 +98,16 @@ func (s *Service) AddUser(ctx context.Context, u NewUserRequest) (*User, error) 
 		Id:       newUserId,
 		Name:     u.Name,
 		Email:    u.Email,
-		Username: strings.Split(u.Email, "@")[0],
+		Username: u.Username,
 	}
-	return s.Store.AddUser(ctx, newUser)
+	nu, err := s.Store.AddUser(ctx, newUser)
+	if err != nil {
+		if errors.Is(err, nectar_errors.DuplicateKeyError{}) {
+			return nil, nectar_errors.BadRequestError{}
+		}
+		return nil, err
+	}
+	return nu, nil
 }
 func (s *Service) DeleteUser(ctx context.Context, id string) error {
 	return s.Store.DeleteUser(ctx, id)
@@ -109,6 +122,15 @@ func (s *Service) UpdateUser(ctx context.Context, id string, usr UpdateUserReque
 		Email:    usr.Email,
 	}
 	return s.Store.UpdateUser(ctx, id, u)
+}
+
+func (s *Service) UpdateUserProfileImage(ctx context.Context, uri string, userId string) (string, error) {
+	resultUris, err := blob.UploadToBlobStore([]string{uri}, ctx, s.BlobStore)
+	if err != nil {
+		return "", fmt.Errorf("blob.UploadToBlobStore in user.UpdateUserProfileImage failed for %v", err)
+	}
+	resultUri := resultUris[0]
+	return s.Store.UpdateUserProfileImage(ctx, resultUri, userId)
 }
 
 func (s *Service) CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error) {
