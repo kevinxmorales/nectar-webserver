@@ -41,12 +41,12 @@ func (h *Handler) AddPlant(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&pr); err != nil {
 		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
+		h.encodeJsonResponse(&w, Response{Message: "An unexpected error occurred"})
 		return
 	}
 	validate := validator.New()
 	if err := validate.Struct(pr); err != nil {
-		res := responseEntity{Message: "Invalid request, could not create plant"}
+		res := Response{Message: "Invalid request, could not create plant"}
 		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		h.encodeJsonResponse(&w, res)
@@ -65,15 +65,15 @@ func (h *Handler) AddPlant(w http.ResponseWriter, r *http.Request) {
 		switch e := err.(type) {
 		case *errs.NoEntityError:
 			w.WriteHeader(http.StatusBadRequest)
-			h.encodeJsonResponse(&w, responseEntity{Message: e.Message})
+			h.encodeJsonResponse(&w, Response{Message: e.Message})
 			return
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
-			h.encodeJsonResponse(&w, responseEntity{Message: "An unexpected error occurred"})
+			h.encodeJsonResponse(&w, Response{Message: "An unexpected error occurred"})
 			return
 		}
 	}
-	res := responseEntity{
+	res := Response{
 		Content: addPlantResponse{ID: newPlant.PlantId},
 		Message: "plant successfully created",
 	}
@@ -91,7 +91,7 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 	_, err := uuid.Parse(id)
 	if err != nil {
-		res := responseEntity{Message: "Invalid id, please provide a valid plant id"}
+		res := Response{Message: "Invalid id, please provide a valid plant id"}
 		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -101,7 +101,7 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.PlantService.GetPlant(r.Context(), id)
 	if err != nil {
-		res := responseEntity{Message: "An unexpected error occurred"}
+		res := Response{Message: "An unexpected error occurred"}
 		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -109,7 +109,7 @@ func (h *Handler) GetPlant(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	res := responseEntity{
+	res := Response{
 		Content: getPlantResponse{Plant: *p},
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
@@ -130,12 +130,12 @@ func (h *Handler) GetPlantsByUserId(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(responseEntity{Message: "An unexpected error occurred"}); err != nil {
+		if err := json.NewEncoder(w).Encode(Response{Message: "An unexpected error occurred"}); err != nil {
 			panic(err)
 		}
 		return
 	}
-	res := responseEntity{
+	res := Response{
 		Content: response{Plants: plantList},
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
@@ -153,7 +153,7 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(responseEntity{Message: "An unexpected error occurred"}); err != nil {
+		if err := json.NewEncoder(w).Encode(Response{Message: "An unexpected error occurred"}); err != nil {
 			panic(err)
 		}
 		return
@@ -162,14 +162,14 @@ func (h *Handler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(responseEntity{Message: "An unexpected error occurred"}); err != nil {
+		if err := json.NewEncoder(w).Encode(Response{Message: "An unexpected error occurred"}); err != nil {
 			panic(err)
 		}
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(responseEntity{Message: "Plant successfully updated"}); err != nil {
+	if err := json.NewEncoder(w).Encode(Response{Message: "Plant successfully updated"}); err != nil {
 		panic(err)
 	}
 	return
@@ -179,7 +179,7 @@ func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
-		res := responseEntity{Message: "No id provided, please provide an id for a plant"}
+		res := Response{Message: "No id provided, please provide an id for a plant"}
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", "invalid id", http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -190,14 +190,14 @@ func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	if err := h.PlantService.DeletePlant(r.Context(), id); err != nil {
 		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(responseEntity{Message: "An unexpected error occurred"}); err != nil {
+		if err := json.NewEncoder(w).Encode(Response{Message: "An unexpected error occurred"}); err != nil {
 			panic(err)
 		}
 		return
 	}
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(responseEntity{Message: "successfully deleted"}); err != nil {
+	if err := json.NewEncoder(w).Encode(Response{Message: "successfully deleted"}); err != nil {
 		panic(err)
 	}
 	return
