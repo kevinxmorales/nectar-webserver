@@ -9,7 +9,6 @@ import (
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
 	"fmt"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/user"
 	"google.golang.org/api/option"
 	"io"
 	"io/ioutil"
@@ -70,9 +69,7 @@ func SetUpAuthClient() (*auth.Client, error) {
 	return authClient, nil
 }
 
-type Store interface {
-	GetCredentialsByEmail(context.Context, string) (user.User, error)
-}
+type Store interface{}
 
 type Service struct {
 	Store      Store
