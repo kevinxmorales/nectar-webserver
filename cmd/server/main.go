@@ -35,7 +35,7 @@ func Run() error {
 	}
 	log.Info("ready to start up server")
 	plantService := plant.NewService(database, blobStoreSession)
-	userService := user.NewService(database, authClient)
+	userService := user.NewService(database, authClient, blobStoreSession)
 	authService := auth.NewService(database, authClient)
 	careService := care.NewService(database)
 	healthService := health.NewService(database)
