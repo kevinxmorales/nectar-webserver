@@ -19,7 +19,11 @@ type S3Response struct {
 	FileName string `json:"fileName"`
 }
 
-func NewBlobStoreSession() (*session.Session, error) {
+type Service struct {
+	BlobSession *session.Session
+}
+
+func NewService() (*Service, error) {
 	log.Info("initializing S3 Connection")
 	accessKey := os.Getenv("ACCESS_KEY")
 	secretKey := os.Getenv("SECRET_KEY")
@@ -33,10 +37,11 @@ func NewBlobStoreSession() (*session.Session, error) {
 		return nil, err
 	}
 	log.Info("successfully created S3 session")
-	return sess, nil
+
+	return &Service{BlobSession: sess}, nil
 }
 
-func UploadToBlobStore(fileList []string, ctx context.Context, sess *session.Session) ([]string, error) {
+func (s *Service) UploadToBlobStore(fileList []string, ctx context.Context) ([]string, error) {
 	//Set up the S3 bucket
 	bucket := os.Getenv("S3_BUCKET")
 	acl := os.Getenv("AWS_ACL")
@@ -51,26 +56,33 @@ func UploadToBlobStore(fileList []string, ctx context.Context, sess *session.Ses
 
 	// Iterate over the local files that need to be updated
 	for i, pathOfFile := range fileList {
+		handleClose := func(file *os.File) {
+			if err := file.Close(); err != nil {
+				log.Error(err)
+				s3Errors[i] = err
+			}
+		}
+		logAndStoreError := func(err error) {
+			log.Error(err)
+			s3Errors[i] = err
+		}
+
 		// Kick off goroutine with thread-safe function to upload to s3
 		wg.Add(1)
 		i := i
-		go func(pathOfFile string, store *session.Session, wg *sync.WaitGroup) {
-			// Defer the
+		go func(pathOfFile string, wg *sync.WaitGroup) {
 			defer func() {
 				wg.Done()
 			}()
 			file, err := os.Open(pathOfFile)
 			if err != nil {
-				log.Error(err)
-				s3Errors[i] = err
+				logAndStoreError(err)
 				return
 			}
 			defer func() {
-				if err := file.Close(); err != nil {
-					log.Error(err)
-				}
+				handleClose(file)
 			}()
-			uploader := s3manager.NewUploader(sess)
+			uploader := s3manager.NewUploader(s.BlobSession)
 			result, err := uploader.UploadWithContext(
 				ctx,
 				&s3manager.UploadInput{
@@ -80,13 +92,12 @@ func UploadToBlobStore(fileList []string, ctx context.Context, sess *session.Ses
 					Body:   file,
 				})
 			if err != nil {
-				log.Error(err)
-				s3Errors[i] = err
+				logAndStoreError(err)
 				return
 			}
 			s3Urls[i] = result.Location
 			log.Info(fmt.Sprintf("Upload result: %+v\n", result))
-		}(pathOfFile, sess, &wg)
+		}(pathOfFile, &wg)
 	}
 	// Block until WaitGroup counter is zero, then return the s3 urls
 	wg.Wait()
@@ -101,13 +112,8 @@ func UploadToBlobStore(fileList []string, ctx context.Context, sess *session.Ses
 	return s3Urls, nil
 }
 
-func DeleteFromS3(fileName string) error {
-	sess, err := NewBlobStoreSession()
-	if err != nil {
-		log.Info("Error creating S3 session", err.Error())
-		return err
-	}
-	service := s3.New(sess)
+func (s *Service) DeleteFromBlobStore(fileName string) error {
+	service := s3.New(s.BlobSession)
 	bucket := os.Getenv("S3_BUCKET")
 	input := &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),

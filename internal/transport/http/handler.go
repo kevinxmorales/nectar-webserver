@@ -73,6 +73,7 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/alive", h.healthCheck).Methods(http.MethodGet)
 	// Plant Endpoints
 	h.Router.HandleFunc("/api/v1/plant", h.JWTAuth(h.AddPlant)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant/image", h.JWTAuth(h.AddPlantImage)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.GetPlant)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.JWTAuth(h.GetPlantsByUserId)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)

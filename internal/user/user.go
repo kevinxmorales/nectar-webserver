@@ -5,7 +5,6 @@ import (
 	"errors"
 	"firebase.google.com/go/v4/auth"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
@@ -53,11 +52,11 @@ type AuthClient interface {
 type Service struct {
 	Store      Store
 	AuthClient AuthClient
-	BlobStore  *session.Session
+	BlobStore  *blob.Service
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store, authClient AuthClient, blobStore *session.Session) *Service {
+func NewService(store Store, authClient AuthClient, blobStore *blob.Service) *Service {
 	return &Service{
 		Store:      store,
 		AuthClient: authClient,
@@ -125,7 +124,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, usr UpdateUserReque
 }
 
 func (s *Service) UpdateUserProfileImage(ctx context.Context, uri string, userId string) (string, error) {
-	resultUris, err := blob.UploadToBlobStore([]string{uri}, ctx, s.BlobStore)
+	resultUris, err := s.BlobStore.UploadToBlobStore([]string{uri}, ctx)
 	if err != nil {
 		return "", fmt.Errorf("blob.UploadToBlobStore in user.UpdateUserProfileImage failed for %v", err)
 	}

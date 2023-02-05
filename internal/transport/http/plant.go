@@ -15,6 +15,7 @@ import (
 
 type PlantService interface {
 	AddPlant(ctx context.Context, p plant.Plant, images []string) (*plant.Plant, error)
+	AddPlantImage(ctx context.Context, filePath string) (string, error)
 	GetPlant(ctx context.Context, id string) (*plant.Plant, error)
 	GetPlantsByUserId(ctx context.Context, id string) ([]plant.Plant, error)
 	UpdatePlant(ctx context.Context, id string, p plant.Plant) (*plant.Plant, error)
@@ -200,5 +201,27 @@ func (h *Handler) DeletePlant(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(Response{Message: "successfully deleted"}); err != nil {
 		panic(err)
 	}
+	return
+}
+
+func (h *Handler) AddPlantImage(w http.ResponseWriter, r *http.Request) {
+	filePath, err := ParseImageFromRequestBody(r)
+	if err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		w.WriteHeader(http.StatusInternalServerError)
+		h.encodeJsonResponse(&w, Response{Message: "Unexpected error, could not add plant image"})
+		return
+	}
+	fileUri, err := h.PlantService.AddPlantImage(r.Context(), filePath)
+	if err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		w.WriteHeader(http.StatusInternalServerError)
+		h.encodeJsonResponse(&w, Response{Message: "Unexpected error, could not add plant image"})
+		return
+	}
+	content := struct {
+		Uri string `json:"imageUrl"`
+	}{Uri: fileUri}
+	h.encodeJsonResponse(&w, Response{Content: content})
 	return
 }

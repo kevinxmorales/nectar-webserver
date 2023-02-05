@@ -3,8 +3,8 @@ package plant
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
 	"time"
 )
@@ -42,14 +42,14 @@ type Store interface {
 // be built upon
 type Service struct {
 	Store     Store
-	BlobStore *session.Session
+	BlobStore *blob.Service
 }
 
 // NewService - returns a pointer to a new service
-func NewService(store Store, blobStoreSession *session.Session) *Service {
+func NewService(store Store, blobService *blob.Service) *Service {
 	return &Service{
 		Store:     store,
-		BlobStore: blobStoreSession,
+		BlobStore: blobService,
 	}
 }
 
@@ -79,4 +79,13 @@ func (s *Service) DeletePlant(ctx context.Context, id string) error {
 func (s *Service) AddPlant(ctx context.Context, newPlant Plant, images []string) (*Plant, error) {
 	log.Info("attempting to add a new plant")
 	return s.Store.AddPlant(ctx, newPlant, images)
+}
+
+func (s *Service) AddPlantImage(ctx context.Context, uri string) (string, error) {
+	resultUris, err := s.BlobStore.UploadToBlobStore([]string{uri}, ctx)
+	if err != nil {
+		return "", fmt.Errorf("blob.UploadToBlobStore in user.UpdateUserProfileImage failed for %v", err)
+	}
+	resultUri := resultUris[0]
+	return resultUri, nil
 }

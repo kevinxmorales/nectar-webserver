@@ -24,7 +24,7 @@ func Run() error {
 		return fmt.Errorf("FAILED to migrate database %v", err)
 	}
 	log.Info("attempting to get s3 connection")
-	blobStoreSession, err := blob.NewBlobStoreSession()
+	blobStoreSession, err := blob.NewService()
 	if err != nil {
 		return fmt.Errorf("FAILED to connect to the blob store %v", err)
 	}
