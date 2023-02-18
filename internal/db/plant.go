@@ -159,14 +159,15 @@ func (d *Database) AddPlant(ctx context.Context, p plant.Plant, images []string)
 		tx.Rollback()
 		return nil, fmt.Errorf("sqlx.tx.ExecContext in %s failed for %v", tag, err)
 	}
+	irList := []imagesRow{}
 	insertImagesQuery := "INSERT INTO plant_images (image, plant_id, is_primary_image) VALUES (:image, :plant_id, :is_primary_image)"
 	for i, _ := range images {
 		isPrimaryImage := i == 0
-		if _, err := tx.NamedExecContext(ctx, insertImagesQuery, []imagesRow{{Image: images[i], PlantId: id, IsPrimaryImage: isPrimaryImage}}); err != nil {
-			log.Error(err)
-			tx.Rollback()
-			return nil, fmt.Errorf("sqlx.tx.NamedExecContext in %s failed for %v", tag, err)
-		}
+		irList = append(irList, imagesRow{Image: images[i], PlantId: id, IsPrimaryImage: isPrimaryImage})
+	}
+	if _, err := tx.NamedExecContext(ctx, insertImagesQuery, irList); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("sqlx.tx.NamedExecContext in %s failed for %v", tag, err)
 	}
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
