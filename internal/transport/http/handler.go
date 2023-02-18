@@ -78,6 +78,8 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/api/v1/plant/user/{id}", h.JWTAuth(h.GetPlantsByUserId)).Methods(http.MethodGet)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.UpdatePlant)).Methods(http.MethodPut)
 	h.Router.HandleFunc("/api/v1/plant/{id}", h.JWTAuth(h.DeletePlant)).Methods(http.MethodDelete)
+	h.Router.HandleFunc("/api/v1/plant/image/plant-id/{id}", h.JWTAuth(h.AddImageToPlant)).Methods(http.MethodPost)
+	h.Router.HandleFunc("/api/v1/plant/image/plant-id/{id}", h.JWTAuth(h.DeletePlantImage)).Methods(http.MethodPut)
 	// User Endpoints
 	h.Router.HandleFunc("/api/v1/user", h.CreateUser).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/user/{id}", h.JWTAuth(h.GetUser)).Methods(http.MethodGet)
@@ -86,7 +88,6 @@ func (h *Handler) mapRoutes() {
 	h.Router.HandleFunc("/api/v1/user/id/{id}/image", h.JWTAuth(h.UpdateUserProfileImage)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/user/id/{id}", h.JWTAuth(h.DeleteUser)).Methods(http.MethodDelete)
 	h.Router.HandleFunc("/api/v1/user/username-check/is-taken", h.CheckIfUsernameIsTaken).Methods(http.MethodGet)
-
 	//Plant Care Log Endpoints
 	h.Router.HandleFunc("/api/v1/plant-care", h.JWTAuth(h.AddCareLogEntry)).Methods(http.MethodPost)
 	h.Router.HandleFunc("/api/v1/plant-care/{id}", h.JWTAuth(h.GetCareLogsEntries)).Methods(http.MethodGet)
