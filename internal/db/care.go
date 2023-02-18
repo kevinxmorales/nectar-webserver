@@ -17,7 +17,7 @@ type LogEntryRow struct {
 	PlantName     string         `db:"plant_name"`
 	Notes         sql.NullString `db:"notes"`
 	WasFertilized bool           `db:"was_fertilized"`
-	WasWatered    bool           `db:"was_waterCed"`
+	WasWatered    bool           `db:"was_watered"`
 }
 
 func mapRowsToLogEntries(rows SqlRows) ([]care.LogEntry, error) {
@@ -39,7 +39,6 @@ func mapRowsToLogEntries(rows SqlRows) ([]care.LogEntry, error) {
 	return logEntries, nil
 }
 
-// order of rows: pcl_id, pcl_plnt_id, pcl_notes, pcl_was_fertilized, pcl_was_watered, pcl_date
 func mapRowsToLogEntry(rows SqlRows) (*care.LogEntry, error) {
 	var log LogEntryRow
 	for rows.Next() {
@@ -137,24 +136,28 @@ func (d *Database) GetCareLogsEntries(ctx context.Context, plantId string) ([]ca
 }
 
 func (d *Database) AddCareLogEntry(ctx context.Context, entry care.LogEntry) (*care.LogEntry, error) {
-	query := `INSERT INTO care_log
-				(plant_id, 
-				notes, 
-				was_watered, 
-				was_fertilized)
-				VALUES 
-					(:plant_id,
+	query := `INSERT INTO care_log (
+                    plant_id, 
+					notes, 
+					was_watered, 
+					was_fertilized,
+					care_date)
+				VALUES (
+				    :plant_id,
 					:notes,
 					:was_watered,
-					:was_fertilized)
-				RETURNING id, plant_id, notes, was_fertilized, was_watered, created_at`
-	row := LogEntryRow{
+					:was_fertilized,
+					:care_date
+				)
+				RETURNING id, plant_id, notes, was_fertilized, was_watered, care_date, created_at`
+	careLogEntry := LogEntryRow{
 		PlantId:       entry.PlantId,
 		Notes:         sql.NullString{String: entry.Notes, Valid: true},
 		WasWatered:    entry.WasWatered,
 		WasFertilized: entry.WasFertilized,
+		CareDate:      entry.CareDate,
 	}
-	rows, err := d.Client.NamedQueryContext(ctx, query, row)
+	rows, err := d.Client.NamedQueryContext(ctx, query, careLogEntry)
 	if err != nil {
 		return nil, fmt.Errorf("NamedQueryContext in db.care.AddCareLogEntry failed for %v", err)
 	}

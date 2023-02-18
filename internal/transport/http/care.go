@@ -35,6 +35,7 @@ func convertRequestToLogEntry(request CareLogEntryRequest) care.LogEntry {
 		Notes:         request.Notes,
 		WasWatered:    request.WasWatered,
 		WasFertilized: request.WasFertilized,
+		CareDate:      request.CareDate,
 	}
 }
 
@@ -85,24 +86,21 @@ func (h *Handler) GetCareLogsEntries(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AddCareLogEntry(w http.ResponseWriter, r *http.Request) {
 	var logEntryRequest CareLogEntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&logEntryRequest); err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, Response{Message: "An unexpected error occurred"})
 		return
 	}
-	log.Info(fmt.Sprintf("before %s", logEntryRequest.CareDate))
-	date, err := time.Parse("12-31-2022", logEntryRequest.CareDate)
-	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
-		w.WriteHeader(http.StatusInternalServerError)
-		h.encodeJsonResponse(&w, Response{Message: "An unexpected error occurred"})
+	if _, err := time.Parse("2006-01-02", logEntryRequest.CareDate); err != nil {
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		h.encodeJsonResponse(&w, Response{Message: "Invalid Date"})
 		return
 	}
-	log.Info(fmt.Sprintf("after %s", date))
 	logEntry := convertRequestToLogEntry(logEntryRequest)
 	insertedEntry, err := h.CareService.AddCareLogEntry(r.Context(), logEntry)
 	if err != nil {
-		log.Info(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
+		log.Errorf(fmt.Sprintf("unsuccessful request, reason: %s,status code: %d", err.Error(), http.StatusInternalServerError))
 		w.WriteHeader(http.StatusInternalServerError)
 		h.encodeJsonResponse(&w, Response{Message: "An unexpected error occurred"})
 		return
