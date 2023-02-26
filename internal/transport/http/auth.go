@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
 	"net/http"
 	"strings"
@@ -21,11 +22,13 @@ func (h *Handler) JWTAuth(original func(w http.ResponseWriter, r *http.Request))
 		// Bearer token-string
 		authHeaderParts := strings.Split(authHeader[0], " ")
 		if len(authHeaderParts) != 2 || strings.ToLower(authHeaderParts[0]) != "bearer" {
+			log.Error("invalid authorization header format")
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
 		token, err := h.AuthService.VerifyIDToken(r.Context(), authHeaderParts[1])
 		if err != nil {
+			log.Errorf("unable to verify session token: %v", err)
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
