@@ -22,6 +22,6 @@ func (h *Handler) healthCheck(w http.ResponseWriter, r *http.Request) {
 	message := "Service alive. Database connection is good."
 	log.Info(message)
 	log.Info(fmt.Sprintf("successfully handled request, status code: %d", http.StatusOK))
-	h.encodeJsonResponse(&w, Response{Message: "Service alive. Database connection is good."})
+	h.encodeJsonResponse(&w, Response{Message: "Service alive. Database connection is good. Cache connection is good"})
 	return
 }

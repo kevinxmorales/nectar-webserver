@@ -50,7 +50,7 @@ func Run() error {
 	userService := user.NewService(database, authClient, blobStoreSession, messageQueue)
 	authService := auth.NewService(database, authClient, cacheClient)
 	careService := care.NewService(database)
-	healthService := health.NewService(database)
+	healthService := health.NewService(database, cacheClient)
 	httpHandler := transportHttp.NewHandler(plantService, userService, careService, authService, healthService)
 
 	printBanner()

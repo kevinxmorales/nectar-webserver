@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis"
@@ -49,4 +50,11 @@ func (c *Cache) Get(key string) (value string, found bool, err error) {
 func (c *Cache) Set(key, value string) error {
 	err := c.Client.Set(key, value, 5*time.Minute).Err()
 	return fmt.Errorf("failed to set value for key: %s and value %s. reason: %v", key, value, err)
+}
+
+func (c *Cache) CheckCacheHealth(ctx context.Context) error {
+	if _, err := c.Client.Ping().Result(); err != nil {
+		return fmt.Errorf("FAILED to ping the cache: %v", err)
+	}
+	return nil
 }
