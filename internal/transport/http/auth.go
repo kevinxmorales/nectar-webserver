@@ -2,13 +2,13 @@ package http
 
 import (
 	"context"
-	firebaseAuth "firebase.google.com/go/v4/auth"
+	"gitlab.com/kevinmorales/nectar-rest-api/internal/auth"
 	"net/http"
 	"strings"
 )
 
 type AuthService interface {
-	VerifyIDToken(ctx context.Context, token string) (*firebaseAuth.Token, error)
+	VerifyIDToken(ctx context.Context, token string) (*auth.AuthToken, error)
 }
 
 func (h *Handler) JWTAuth(original func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {

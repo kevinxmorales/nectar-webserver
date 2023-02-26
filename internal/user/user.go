@@ -3,10 +3,8 @@ package user
 import (
 	"context"
 	"errors"
-	"firebase.google.com/go/v4/auth"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/nectar_errors"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/validation"
 )
@@ -41,26 +39,36 @@ type Store interface {
 	AddUser(ctx context.Context, u User) (*User, error)
 	DeleteUser(ctx context.Context, id string) error
 	UpdateUser(ctx context.Context, id string, u User) (*User, error)
-	UpdateUserProfileImage(ctx context.Context, uri string, id string) (string, error)
-	CheckIfUsernameIsTaken(ctx context.Context, username string) (bool, error)
+	UpdateUserProfileImage(ctx context.Context, uri string, id string) (resultUri string, err error)
+	CheckIfUsernameIsTaken(ctx context.Context, username string) (isUserNameTaken bool, err error)
 }
 
 type AuthClient interface {
-	CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error)
+	CreateUser(ctx context.Context, newUserId string, email string, password string) error
 }
 
 type Service struct {
-	Store      Store
-	AuthClient AuthClient
-	BlobStore  *blob.Service
+	Store        Store
+	AuthClient   AuthClient
+	BlobStore    BlobStore
+	MessageQueue MessageQueue
+}
+
+type MessageQueue interface {
+	PushToQueue(ctx context.Context, topic string, message []byte) error
+}
+
+type BlobStore interface {
+	UploadToBlobStore(fileList []string, ctx context.Context) (resultUris []string, err error)
 }
 
 // NewService - returns a pointer to a new user service
-func NewService(store Store, authClient AuthClient, blobStore *blob.Service) *Service {
+func NewService(store Store, authClient AuthClient, blobStore BlobStore, messageQueue MessageQueue) *Service {
 	return &Service{
-		Store:      store,
-		AuthClient: authClient,
-		BlobStore:  blobStore,
+		Store:        store,
+		AuthClient:   authClient,
+		BlobStore:    blobStore,
+		MessageQueue: messageQueue,
 	}
 }
 
@@ -84,13 +92,7 @@ func (s *Service) AddUser(ctx context.Context, u NewUserRequest) (*User, error) 
 		return nil, fmt.Errorf("email validation for email %s in %s, failed for %v", u.Email, tag, err)
 	}
 	newUserId := uuid.NewV4().String()
-	params := (&auth.UserToCreate{}).
-		UID(newUserId).
-		Email(u.Email).
-		EmailVerified(false).
-		Password(u.Password).
-		Disabled(false)
-	if _, err := s.AuthClient.CreateUser(ctx, params); err != nil {
+	if err := s.AuthClient.CreateUser(ctx, newUserId, u.Email, u.Password); err != nil {
 		return nil, err
 	}
 	newUser := User{

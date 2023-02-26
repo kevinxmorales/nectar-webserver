@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/kevinmorales/nectar-rest-api/internal/blob"
 	"gitlab.com/kevinmorales/nectar-rest-api/internal/care"
 	"time"
 )
@@ -40,18 +39,28 @@ type Store interface {
 	DeletePlantImage(ctx context.Context, plantId string, uri string) error
 }
 
+type MessageQueue interface {
+	PushToQueue(ctx context.Context, topic string, message []byte) error
+}
+
+type BlobStore interface {
+	UploadToBlobStore(fileList []string, ctx context.Context) (resultUris []string, err error)
+}
+
 // Service - is the struct on which out logic will
 // be built upon
 type Service struct {
-	Store     Store
-	BlobStore *blob.Service
+	Store        Store
+	MessageQueue MessageQueue
+	BlobStore    BlobStore
 }
 
 // NewService - returns a pointer to a new service
-func NewService(store Store, blobService *blob.Service) *Service {
+func NewService(store Store, blobService BlobStore, messageQueue MessageQueue) *Service {
 	return &Service{
-		Store:     store,
-		BlobStore: blobService,
+		Store:        store,
+		BlobStore:    blobService,
+		MessageQueue: messageQueue,
 	}
 }
 

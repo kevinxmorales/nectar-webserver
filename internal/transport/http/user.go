@@ -15,7 +15,7 @@ import (
 
 type UserService interface {
 	GetUser(ctx context.Context, id string) (*user.User, error)
-	GetUserById(ctx context.Context, firebaseId string) (*user.User, error)
+	GetUserById(ctx context.Context, id string) (*user.User, error)
 	AddUser(ctx context.Context, u user.NewUserRequest) (*user.User, error)
 	DeleteUser(ctx context.Context, id string) error
 	UpdateUser(ctx context.Context, id string, u user.UpdateUserRequest) (*user.User, error)
