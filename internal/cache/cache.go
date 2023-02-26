@@ -14,7 +14,7 @@ type Cache struct {
 
 func NewCache() (*Cache, error) {
 	host := os.Getenv("REDISHOST")
-	port := os.Getenv("REDISPASSWORD")
+	port := os.Getenv("REDISPORT")
 	password := os.Getenv("REDISPASSWORD")
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, port),
