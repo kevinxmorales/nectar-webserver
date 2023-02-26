@@ -5,10 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {
+	log.Info("initializing gob...")
 	gob.Register(SX{})
+	gob.Register(map[string]interface{}{})
+	log.Info("finished initialing gob")
 }
 
 type SX map[string]interface{}
